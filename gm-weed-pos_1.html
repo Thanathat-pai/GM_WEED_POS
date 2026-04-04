@@ -336,7 +336,7 @@ function SetupBanner({ onConnect }) {
 }
 
 // ── POS VIEW ─────────────────────────────────────────────────
-function POSView({ db }) {
+function POSView({ db, currentStaff }) {
   const [strains, setStrains]     = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cart, setCart]           = useState([]);
@@ -401,7 +401,7 @@ function POSView({ db }) {
         discount_bill: billDiscAmt,
         discount_note: billDiscNote || null,
         grand_total: grand,
-        staff_name: 'พนักงาน',
+        staff_id: currentStaff?.id || null,
       }).select().single();
       if (txnErr) throw txnErr;
 
@@ -560,6 +560,247 @@ function POSView({ db }) {
             {loading ? 'กำลังบันทึก...' : `ชำระเงิน ${fmt(grand)}`}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── LOGIN SCREEN ─────────────────────────────────────────────
+function LoginScreen({ db, onLogin }) {
+  const [staffList, setStaffList]   = useState([]);
+  const [selected, setSelected]     = useState(null);
+  const [pin, setPin]               = useState('');
+  const [errMsg, setErrMsg]         = useState('');
+  const [shaking, setShaking]       = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const dotsRef = useRef(null);
+
+  useEffect(() => { loadStaff(); }, []);
+
+  async function loadStaff() {
+    const { data } = await db.from('staff')
+      .select('id, name').eq('is_active', true).order('name');
+    if (data) setStaffList(data);
+  }
+
+  function selectStaff(s) {
+    setSelected(s);
+    setPin('');
+    setErrMsg('');
+  }
+
+  async function handleDigit(d) {
+    if (!selected || loading) return;
+    const next = pin + d;
+    setPin(next);
+    setErrMsg('');
+
+    if (next.length === 4) {
+      setLoading(true);
+      try {
+        const { data: saltRow } = await db.from('staff')
+          .select('pin_salt').eq('id', selected.id).single();
+        if (!saltRow) throw new Error('ไม่พบข้อมูล');
+
+        const hash = await hashPIN(saltRow.pin_salt, next);
+        const { data: staffRow } = await db.from('staff')
+          .select('id, name, role')
+          .eq('id', selected.id)
+          .eq('pin_hash', hash)
+          .eq('is_active', true)
+          .single();
+
+        if (!staffRow) throw new Error('PIN ไม่ถูกต้อง');
+
+        const session = { id: staffRow.id, name: staffRow.name, role: staffRow.role };
+        localStorage.setItem('gm_staff', JSON.stringify(session));
+        onLogin(session);
+      } catch (e) {
+        triggerError(e.message || 'PIN ไม่ถูกต้อง');
+      }
+      setLoading(false);
+    }
+  }
+
+  function triggerError(msg) {
+    setErrMsg(msg);
+    setShaking(true);
+    setPin('');
+    setTimeout(() => setShaking(false), 400);
+  }
+
+  function handleBack() {
+    setPin(p => p.slice(0, -1));
+    setErrMsg('');
+  }
+
+  const numpadKeys = ['1','2','3','4','5','6','7','8','9','','0','del'];
+
+  return (
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-title">GM.Weed POS</div>
+        <div className="auth-sub">เลือกพนักงานแล้วใส่ PIN</div>
+
+        <div className="staff-list">
+          {staffList.map(s => (
+            <button key={s.id} className={`staff-btn ${selected?.id===s.id?'sel':''}`}
+                    onClick={() => selectStaff(s)}>
+              👤 {s.name}
+            </button>
+          ))}
+          {!staffList.length && (
+            <div style={{textAlign:'center',color:'var(--muted)',fontSize:12,padding:12}}>
+              <span className="spinner"></span>
+            </div>
+          )}
+        </div>
+
+        {selected && (
+          <>
+            <div className={`pin-dots ${shaking?'shake':''}`} ref={dotsRef}>
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`pin-dot ${i < pin.length ? (errMsg?'err':'filled') : ''}`}/>
+              ))}
+            </div>
+
+            <div className="pin-err">{errMsg}</div>
+
+            {loading
+              ? <div style={{textAlign:'center',padding:20}}><span className="spinner"></span></div>
+              : <div className="numpad">
+                  {numpadKeys.map((k, i) => {
+                    if (k === '')  return <div key={i} className="numpad-key empty"/>;
+                    if (k === 'del') return (
+                      <button key={i} className="numpad-key del" onClick={handleBack}
+                              disabled={!pin.length}>⌫</button>
+                    );
+                    return (
+                      <button key={i} className="numpad-key" onClick={() => handleDigit(k)}
+                              disabled={pin.length >= 4}>{k}</button>
+                    );
+                  })}
+                </div>
+            }
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── BOOTSTRAP SCREEN ─────────────────────────────────────────
+function BootstrapScreen({ db, onDone }) {
+  const [name, setName]       = useState('');
+  const [pin1, setPin1]       = useState('');
+  const [pin2, setPin2]       = useState('');
+  const [step, setStep]       = useState('name'); // 'name' | 'pin1' | 'pin2'
+  const [errMsg, setErrMsg]   = useState('');
+  const [shaking, setShaking] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const canSubmit = name.trim() && pin1.length === 4 && pin2.length === 4;
+
+  function handleDigit(d) {
+    setErrMsg('');
+    if (step === 'pin1' && pin1.length < 4) {
+      const next = pin1 + d;
+      setPin1(next);
+      if (next.length === 4) setStep('pin2');
+    } else if (step === 'pin2' && pin2.length < 4) {
+      setPin2(pin2 + d);
+    }
+  }
+
+  function handleBack() {
+    setErrMsg('');
+    if (step === 'pin2' && pin2.length === 0) { setStep('pin1'); setPin1(p=>p.slice(0,-1)); }
+    else if (step === 'pin2') setPin2(p=>p.slice(0,-1));
+    else if (step === 'pin1') setPin1(p=>p.slice(0,-1));
+  }
+
+  async function submit() {
+    if (pin1 !== pin2) {
+      setErrMsg('PIN ไม่ตรงกัน'); setShaking(true); setPin1(''); setPin2(''); setStep('pin1');
+      setTimeout(()=>setShaking(false), 400); return;
+    }
+    setLoading(true);
+    try {
+      const salt = generateSalt();
+      const hash = await hashPIN(salt, pin1);
+      const { data, error } = await db.from('staff')
+        .insert({ name: name.trim(), pin_hash: hash, pin_salt: salt, role: 'owner' })
+        .select('id, name, role').single();
+      if (error) throw error;
+      const session = { id: data.id, name: data.name, role: data.role };
+      localStorage.setItem('gm_staff', JSON.stringify(session));
+      onDone(session);
+    } catch(e) {
+      setErrMsg(e.message || 'เกิดข้อผิดพลาด');
+    }
+    setLoading(false);
+  }
+
+  const currentPin = step === 'pin1' ? pin1 : pin2;
+  const numpadKeys = ['1','2','3','4','5','6','7','8','9','','0','del'];
+
+  return (
+    <div className="auth-shell">
+      <div className="auth-card">
+        <div className="auth-title">ตั้งค่าระบบครั้งแรก</div>
+        <div className="auth-sub">สร้างบัญชี Owner เพื่อเริ่มใช้งาน</div>
+
+        <div style={{marginBottom:16}}>
+          <label>ชื่อเจ้าของร้าน</label>
+          <input value={name} onChange={e=>{ setName(e.target.value); setErrMsg(''); }}
+                 placeholder="เช่น สมชาย" onFocus={()=>setStep('name')} />
+        </div>
+
+        <div className="auth-section">
+          <div className="auth-section-label">
+            {step === 'pin1' || pin1.length === 0 ? 'ตั้ง PIN (4 หลัก)' : 'ยืนยัน PIN อีกครั้ง'}
+          </div>
+
+          <div className={`pin-dots ${shaking?'shake':''}`} style={{marginBottom:12}}>
+            {[0,1,2,3].map(i => (
+              <div key={i} className={`pin-dot ${i < currentPin.length ? (errMsg?'err':'filled') : ''}`}/>
+            ))}
+          </div>
+
+          {pin1.length === 4 && step !== 'pin1' && (
+            <div style={{fontSize:11,textAlign:'center',color:'var(--muted)',marginBottom:10}}>
+              ✓ PIN แรกครบแล้ว — ยืนยัน PIN อีกครั้ง
+            </div>
+          )}
+
+          <div className="pin-err">{errMsg}</div>
+
+          {name.trim() && !loading && (
+            <div className="numpad">
+              {numpadKeys.map((k, i) => {
+                if (k === '') return <div key={i} className="numpad-key empty"/>;
+                if (k === 'del') return (
+                  <button key={i} className="numpad-key del" onClick={handleBack}>⌫</button>
+                );
+                return (
+                  <button key={i} className="numpad-key" onClick={()=>handleDigit(k)}
+                          disabled={currentPin.length >= 4}>{k}</button>
+                );
+              })}
+            </div>
+          )}
+
+          {!name.trim() && (
+            <div style={{textAlign:'center',fontSize:12,color:'var(--muted)',padding:8}}>
+              ใส่ชื่อก่อน แล้วค่อยตั้ง PIN
+            </div>
+          )}
+        </div>
+
+        <button className="btn btn-primary" style={{width:'100%',marginTop:20,padding:12,fontSize:14}}
+                onClick={submit} disabled={!canSubmit || loading}>
+          {loading ? 'กำลังบันทึก...' : 'เริ่มใช้งาน'}
+        </button>
       </div>
     </div>
   );
@@ -1093,6 +1334,213 @@ function ReportView({ db }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ── STAFF VIEW ───────────────────────────────────────────────
+function StaffView({ db }) {
+  const [staffList, setStaffList] = useState([]);
+  const [modal, setModal]         = useState(null); // 'add' | 'edit'
+  const [editing, setEditing]     = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const [msg, setMsg]             = useState(null);
+
+  const initForm = { name:'', role:'staff', pin1:'', pin2:'', changePIN: false };
+  const [form, setForm] = useState(initForm);
+  const [pinStep, setPinStep] = useState('pin1');
+  const [pinErr, setPinErr]   = useState('');
+  const [pinShake, setPinShake] = useState(false);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    const { data } = await db.from('staff').select('*').order('created_at');
+    if (data) setStaffList(data);
+  }
+
+  function setF(k, v) { setForm(p => ({...p, [k]: v})); }
+
+  function openAdd() {
+    setForm(initForm); setPinStep('pin1'); setPinErr(''); setEditing(null); setModal('add');
+  }
+  function openEdit(s) {
+    setForm({ name:s.name, role:s.role, pin1:'', pin2:'', changePIN: false });
+    setPinStep('pin1'); setPinErr(''); setEditing(s); setModal('edit');
+  }
+
+  function handlePinDigit(d) {
+    setPinErr('');
+    if (pinStep === 'pin1' && form.pin1.length < 4) {
+      const next = form.pin1 + d;
+      setF('pin1', next);
+      if (next.length === 4) setPinStep('pin2');
+    } else if (pinStep === 'pin2' && form.pin2.length < 4) {
+      setF('pin2', form.pin2 + d);
+    }
+  }
+  function handlePinBack() {
+    setPinErr('');
+    if (pinStep === 'pin2' && form.pin2.length === 0) { setPinStep('pin1'); setF('pin1', form.pin1.slice(0,-1)); }
+    else if (pinStep === 'pin2') setF('pin2', form.pin2.slice(0,-1));
+    else setF('pin1', form.pin1.slice(0,-1));
+  }
+
+  async function save() {
+    const needPIN = modal === 'add' || (modal === 'edit' && form.changePIN);
+    if (needPIN) {
+      if (form.pin1 !== form.pin2) {
+        setPinErr('PIN ไม่ตรงกัน'); setPinShake(true);
+        setF('pin1',''); setF('pin2',''); setPinStep('pin1');
+        setTimeout(()=>setPinShake(false),400); return;
+      }
+    }
+    setLoading(true);
+    try {
+      let payload = { name: form.name.trim(), role: form.role };
+      if (needPIN) {
+        const salt = generateSalt();
+        const hash = await hashPIN(salt, form.pin1);
+        payload = { ...payload, pin_salt: salt, pin_hash: hash };
+      }
+      let error;
+      if (editing) {
+        ({ error } = await db.from('staff').update(payload).eq('id', editing.id));
+      } else {
+        ({ error } = await db.from('staff').insert(payload));
+      }
+      if (error) throw error;
+      setMsg({ type:'ok', text: editing ? 'อัปเดตสำเร็จ' : 'เพิ่มพนักงานสำเร็จ' });
+      setModal(null); load();
+    } catch(e) {
+      setMsg({ type:'err', text: e.message });
+    }
+    setLoading(false);
+    setTimeout(() => setMsg(null), 3000);
+  }
+
+  async function toggleActive(s) {
+    await db.from('staff').update({ is_active: !s.is_active }).eq('id', s.id);
+    load();
+  }
+
+  const needPIN = modal === 'add' || (modal === 'edit' && form.changePIN);
+  const currentPin = pinStep === 'pin1' ? form.pin1 : form.pin2;
+  const canSave = form.name.trim() && (!needPIN || (form.pin1.length===4 && form.pin2.length===4));
+  const numpadKeys = ['1','2','3','4','5','6','7','8','9','','0','del'];
+
+  return (
+    <div className="page">
+      {msg && <div className={`alert alert-${msg.type==='ok'?'ok':'err'}`}>{msg.text}</div>}
+
+      <div className="page-title">
+        จัดการพนักงาน
+        <button className="btn btn-primary" style={{marginLeft:'auto'}} onClick={openAdd}>
+          + เพิ่มพนักงาน
+        </button>
+      </div>
+
+      <div className="card">
+        <table>
+          <thead>
+            <tr><th>ชื่อ</th><th>Role</th><th>สถานะ</th><th>เพิ่มเมื่อ</th><th>จัดการ</th></tr>
+          </thead>
+          <tbody>
+            {!staffList.length && (
+              <tr><td colSpan={5} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ยังไม่มีข้อมูล</td></tr>
+            )}
+            {staffList.map(s => (
+              <tr key={s.id}>
+                <td style={{fontWeight:600}}>{s.name}</td>
+                <td>
+                  <span className={`pill ${s.role==='owner'?'s':'h'}`}>
+                    {s.role === 'owner' ? 'Owner' : 'Staff'}
+                  </span>
+                </td>
+                <td>
+                  <span className={`pill ${s.is_active?'ok':'out'}`}>
+                    {s.is_active ? 'Active' : 'ปิด'}
+                  </span>
+                </td>
+                <td style={{fontSize:11,color:'var(--muted)'}}>
+                  {new Date(s.created_at).toLocaleDateString('th-TH')}
+                </td>
+                <td>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn btn-sm btn-outline" onClick={()=>openEdit(s)}>แก้ไข</button>
+                    <button className="btn btn-sm btn-outline" onClick={()=>toggleActive(s)}>
+                      {s.is_active ? 'ปิด' : 'เปิด'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="modal">
+            <div className="modal-hd">
+              <h3>{modal==='add' ? 'เพิ่มพนักงาน' : 'แก้ไขข้อมูล'}</h3>
+              <button className="close-btn" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div>
+                  <label>ชื่อ *</label>
+                  <input value={form.name} onChange={e=>setF('name',e.target.value)} placeholder="ชื่อพนักงาน" />
+                </div>
+                <div>
+                  <label>Role</label>
+                  <select value={form.role} onChange={e=>setF('role',e.target.value)}>
+                    <option value="staff">Staff</option>
+                    <option value="owner">Owner</option>
+                  </select>
+                </div>
+
+                {modal === 'edit' && (
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <input type="checkbox" id="changePIN" checked={form.changePIN}
+                           onChange={e=>{ setF('changePIN',e.target.checked); setF('pin1',''); setF('pin2',''); setPinStep('pin1'); setPinErr(''); }} />
+                    <label htmlFor="changePIN" style={{textTransform:'none',fontSize:13,letterSpacing:0,color:'var(--text)',marginBottom:0}}>
+                      เปลี่ยน PIN
+                    </label>
+                  </div>
+                )}
+
+                {needPIN && (
+                  <div className="auth-section" style={{marginTop:0}}>
+                    <div className="auth-section-label">
+                      {pinStep==='pin1' || form.pin1.length===0 ? 'ตั้ง PIN (4 หลัก)' : 'ยืนยัน PIN'}
+                    </div>
+                    <div className={`pin-dots ${pinShake?'shake':''}`} style={{marginBottom:12}}>
+                      {[0,1,2,3].map(i => (
+                        <div key={i} className={`pin-dot ${i < currentPin.length ? (pinErr?'err':'filled') : ''}`}/>
+                      ))}
+                    </div>
+                    <div className="pin-err">{pinErr}</div>
+                    <div className="numpad" style={{maxWidth:200,margin:'0 auto'}}>
+                      {numpadKeys.map((k,i) => {
+                        if (k==='') return <div key={i} className="numpad-key empty"/>;
+                        if (k==='del') return <button key={i} className="numpad-key del" onClick={handlePinBack}>⌫</button>;
+                        return <button key={i} className="numpad-key" onClick={()=>handlePinDigit(k)} disabled={currentPin.length>=4}>{k}</button>;
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={()=>setModal(null)}>ยกเลิก</button>
+              <button className="btn btn-primary" onClick={save} disabled={!canSave||loading}>
+                {loading ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
