@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GM.Weed POS</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#16a34a;--green-l:#f0fdf4;--green-m:#86efac;
+  --amber:#d97706;--amber-l:#fef3c7;
+  --red:#dc2626;--red-l:#fef2f2;
+  --purple:#7c3aed;--purple-l:#f5f3ff;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --bg:#f8fafc;--surface:#ffffff;--border:#e2e8f0;
+  --text:#1e293b;--muted:#64748b;--faint:#f1f5f9;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* NAV */
+.nav{display:flex;align-items:center;background:#111;padding:0 20px;height:52px;gap:4px;position:sticky;top:0;z-index:100}
+.brand{font-size:15px;font-weight:600;color:#4ade80;margin-right:24px;letter-spacing:.05em;white-space:nowrap}
+.ntab{padding:7px 16px;border-radius:7px;font-size:13px;border:none;background:transparent;color:rgba(255,255,255,.45);cursor:pointer;transition:all 120ms;white-space:nowrap}
+.ntab.on{background:rgba(74,222,128,.18);color:#4ade80}
+.ntab:hover:not(.on){color:rgba(255,255,255,.8)}
+.nav-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+.clk{font-size:11px;color:rgba(255,255,255,.35)}
+.db-badge{font-size:10px;padding:3px 10px;border-radius:20px;font-weight:500}
+.db-ok{background:rgba(74,222,128,.2);color:#4ade80}
+.db-err{background:rgba(239,68,68,.2);color:#f87171}
+.db-load{background:rgba(250,204,21,.2);color:#fbbf24}
+
+/* SETUP BANNER */
+.setup-banner{background:#1e3a5f;border-bottom:1px solid #2563eb;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.setup-banner p{color:#93c5fd;font-size:13px;flex:1}
+.setup-banner input{padding:7px 12px;border-radius:7px;border:1px solid #3b82f6;background:#1e40af;color:#fff;font-size:12px;width:280px}
+.setup-banner input::placeholder{color:#93c5fd}
+.setup-btn{padding:7px 16px;background:#3b82f6;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.setup-btn:hover{background:#2563eb}
+
+/* LAYOUT */
+.page{padding:20px;max-width:1400px;margin:0 auto}
+.page-title{font-size:18px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+
+/* CARDS & TABLES */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.card-hd{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-hd h3{font-size:14px;font-weight:600}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);background:var(--faint);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.05em}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--faint)}
+
+/* PILLS */
+.pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.s{background:#fef9c3;color:#854d0e}
+.i{background:#ede9fe;color:#5b21b6}
+.h{background:#dcfce7;color:#14532d}
+.c{background:#e0f2fe;color:#075985}
+.ok{background:var(--green-l);color:var(--green)}
+.low{background:var(--amber-l);color:var(--amber)}
+.out{background:var(--red-l);color:var(--red)}
+
+/* FORMS */
+.form-grid{display:grid;gap:14px}
+.form-grid-2{grid-template-columns:1fr 1fr}
+.form-grid-3{grid-template-columns:1fr 1fr 1fr}
+label{font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);background:var(--surface);transition:border 120ms}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+textarea{resize:vertical;min-height:70px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 120ms;white-space:nowrap}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:#15803d}
+.btn-primary:disabled{background:#94a3b8;cursor:not-allowed}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:#1d4ed8}
+.btn-outline{background:none;border:1px solid var(--border);color:var(--muted)}
+.btn-outline:hover{background:var(--faint);color:var(--text)}
+.btn-danger{background:none;border:1px solid var(--red-l);color:var(--red)}
+.btn-danger:hover{background:var(--red-l)}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-hd{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-hd h3{font-size:15px;font-weight:600}
+.modal-body{padding:22px}
+.modal-ft{padding:16px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.close-btn{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1;padding:2px}
+
+/* STAT CARDS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.stat-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:700}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* POS LAYOUT */
+.pos-shell{display:grid;grid-template-columns:1fr 300px;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-height:600px}
+.strain-area{padding:16px;background:var(--faint);border-right:1px solid var(--border)}
+.strain-tb{display:flex;gap:8px;margin-bottom:14px}
+.strain-search{flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--surface);color:var(--text)}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:8px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;transition:all 120ms;position:relative;user-select:none}
+.sc:hover{border-color:var(--green-m);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.sc.sel{border-color:var(--green);border-width:2px;background:var(--green-l)}
+.sc.disabled{opacity:.5;cursor:not-allowed}
+.sc-top{display:flex;justify-content:space-between;margin-bottom:6px}
+.sc-name{font-size:13px;font-weight:600}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.sc-ft{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.sc-price{font-size:13px;font-weight:600;color:var(--green)}
+
+/* CART */
+.cart{display:flex;flex-direction:column;background:var(--surface)}
+.cart-hd{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.cart-hd h3{font-size:13px;font-weight:600}
+.cart-body{flex:1;overflow-y:auto;padding:10px}
+.ci{border:1px solid var(--border);border-radius:9px;margin-bottom:6px;overflow:hidden}
+.ci-main{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.ci-info{flex:1}
+.ci-name{font-size:12px;font-weight:600}
+.ci-unit{font-size:10px;color:var(--muted)}
+.gram-in{width:54px;padding:4px 6px;border:1px solid var(--green-m);border-radius:6px;font-size:12px;text-align:center;background:var(--green-l);color:var(--text)}
+.ci-price{font-size:12px;font-weight:600;min-width:60px;text-align:right}
+.disc-btn{font-size:10px;color:var(--purple);background:var(--purple-l);border:none;border-radius:5px;padding:3px 8px;cursor:pointer}
+.ci-disc{padding:0 10px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.disc-sel{padding:3px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text)}
+.disc-in{width:70px;padding:3px 7px;border:1px solid var(--purple);border-radius:6px;font-size:11px;background:var(--purple-l);color:var(--purple);text-align:center}
+.disc-saved{font-size:10px;color:var(--purple);font-weight:600}
+.bill-disc{padding:8px 12px;border-top:1px solid var(--border);background:var(--faint)}
+.bill-disc-hd{display:flex;align-items:center;justify-content:space-between}
+.bill-disc-hd span{font-size:11px;color:var(--muted)}
+.bill-disc-row{display:flex;gap:6px;margin-top:6px}
+.totals{padding:10px 14px;border-top:1px solid var(--border)}
+.tr{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
+.tr.muted{color:var(--muted)}
+.tr.disc{color:var(--purple)}
+.tr.big{font-size:15px;font-weight:700;padding-top:8px;border-top:1px solid var(--border);margin-top:4px}
+.pay-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 12px}
+.pb{padding:8px 4px;border:1px solid var(--border);border-radius:7px;font-size:11px;cursor:pointer;background:var(--faint);color:var(--muted);text-align:center;transition:all 120ms}
+.pb.on{border-color:var(--green-m);background:var(--green-l);color:var(--green);font-weight:600}
+.pay-btn{margin:0 12px 14px;padding:13px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:background 120ms}
+.pay-btn:hover{background:#15803d}
+.pay-btn:disabled{background:#94a3b8;cursor:not-allowed}
+
+/* CUSTOMER SELECT */
+.cust-bar{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.cust-tag{font-size:11px;padding:3px 10px;background:var(--amber-l);color:var(--amber);border-radius:20px;font-weight:600}
+
+/* ALERT */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.alert-info{background:var(--blue-l);color:var(--blue)}
+.alert-warn{background:var(--amber-l);color:var(--amber)}
+.alert-err{background:var(--red-l);color:var(--red)}
+.alert-ok{background:var(--green-l);color:var(--green)}
+
+/* EMPTY */
+.empty{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+
+/* LOADING */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,0,0,.1);border-left-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PROGRESS BAR */
+.bar-wrap{width:70px;height:6px;background:var(--faint);border-radius:3px;display:inline-block;vertical-align:middle}
+.bar{height:100%;border-radius:3px}
+
+/* COA BADGE */
+.coa-badge{font-size:10px;padding:2px 8px;border-radius:4px;background:var(--blue-l);color:var(--blue);font-weight:500}
+
+@media(max-width:768px){
+  .pos-shell{grid-template-columns:1fr}
+  .cart{border-top:1px solid var(--border)}
+  .form-grid-2,.form-grid-3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+const { createClient } = supabase;
+
+// ── SUPABASE CLIENT ─────────────────────────────────────────
+let sb = null;
+function getClient(url, key) {
+  if (!url || !key) return null;
+  try { sb = createClient(url, key); return sb; } catch { return null; }
+}
+
+// ── HELPERS ─────────────────────────────────────────────────
+const fmt = (n) => '฿' + (Math.round(n || 0)).toLocaleString('th-TH');
+const today = () => new Date().toISOString().split('T')[0];
+const txnCode = () => 'TXN-' + new Date().toISOString().replace(/[-T:.Z]/g,'').slice(0,14) + '-' + Math.random().toString(36).slice(2,5).toUpperCase();
+const lotCode = () => 'LOT-' + today().replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,5).toUpperCase();
+const typeLabel = { sativa:'Sativa', indica:'Indica', hybrid:'Hybrid', cbd:'CBD' };
+const typeCls   = { sativa:'s', indica:'i', hybrid:'h', cbd:'c' };
+
+function stockCls(s) {
+  if (!s || s.stock_g <= 0) return 'out';
+  if (s.stock_g / s.max_stock_g < 0.25) return 'low';
+  return 'ok';
+}
+function stockLabel(s) {
+  if (!s || s.stock_g <= 0) return 'หมด';
+  return s.stock_g.toFixed(1) + 'g';
+}
+
+function itemNet(ci) {
+  const base = ci.price_per_g * ci.weight_g;
+  if (ci.disc_type === 'pct')         return base * (1 - ci.disc_value / 100);
+  if (ci.disc_type === 'baht')        return Math.max(0, base - ci.disc_value);
+  if (ci.disc_type === 'price_per_g') return ci.disc_value * ci.weight_g;
+  return base;
+}
+
+// ── SETUP FORM ───────────────────────────────────────────────
+function SetupBanner({ onConnect }) {
+  const [url, setUrl] = useState(localStorage.getItem('sb_url') || '');
+  const [key, setKey] = useState(localStorage.getItem('sb_key') || '');
+  const [testing, setTesting] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function connect() {
+    setTesting(true); setErr('');
+    const client = getClient(url.trim(), key.trim());
+    if (!client) { setErr('URL หรือ Key ไม่ถูกต้อง'); setTesting(false); return; }
+    const { error } = await client.from('strains').select('id').limit(1);
+    if (error) { setErr('เชื่อมต่อไม่ได้: ' + error.message); setTesting(false); return; }
+    localStorage.setItem('sb_url', url.trim());
+    localStorage.setItem('sb_key', key.trim());
+    onConnect(client);
+    setTesting(false);
+  }
+
+  return (
+    <div className="setup-banner">
+      <p>🔌 กรุณาใส่ Supabase credentials เพื่อเชื่อมต่อฐานข้อมูล</p>
+      <input placeholder="Project URL — https://xxxx.supabase.co" value={url} onChange={e=>setUrl(e.target.value)} />
+      <input placeholder="anon/public API Key" value={key} onChange={e=>setKey(e.target.value)} type="password" />
+      <button className="setup-btn" onClick={connect} disabled={testing}>
+        {testing ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ'}
+      </button>
+      {err && <span style={{color:'#f87171',fontSize:12}}>{err}</span>}
+    </div>
+  );
+}
+
+// ── POS VIEW ─────────────────────────────────────────────────
+function POSView({ db }) {
+  const [strains, setStrains]     = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [cart, setCart]           = useState([]);
+  const [customer, setCustomer]   = useState(null);
+  const [searchQ, setSearchQ]     = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [billDiscOpen, setBillDiscOpen] = useState(false);
+  const [billDiscType, setBillDiscType] = useState('pct');
+  const [billDiscVal, setBillDiscVal]   = useState('');
+  const [billDiscNote, setBillDiscNote] = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [msg, setMsg]             = useState(null);
+  const [showCustModal, setShowCustModal] = useState(false);
+
+  useEffect(() => { loadStrains(); loadCustomers(); }, []);
+
+  async function loadStrains() {
+    const { data } = await db.from('strains').select('*').eq('is_active', true).order('name');
+    if (data) setStrains(data);
+  }
+  async function loadCustomers() {
+    const { data } = await db.from('customers').select('id,name,phone,id_card,total_spent,visit_count').order('name');
+    if (data) setCustomers(data);
+  }
+
+  const filtered = strains.filter(s => s.name.toLowerCase().includes(searchQ.toLowerCase()));
+
+  function addToCart(strain) {
+    if (strain.stock_g <= 0) return;
+    setCart(prev => {
+      if (prev.find(c => c.strain_id === strain.id)) return prev;
+      return [...prev, { strain_id: strain.id, strain_name: strain.name, price_per_g: strain.price_per_g, weight_g: 1, disc_type: 'none', disc_value: 0, discOpen: false }];
+    });
+  }
+
+  function updateCart(strain_id, field, val) {
+    setCart(prev => prev.map(c => c.strain_id === strain_id ? { ...c, [field]: val } : c));
+  }
+  function removeCart(strain_id) {
+    setCart(prev => prev.filter(c => c.strain_id !== strain_id));
+  }
+
+  const itemSubtotal = cart.reduce((a, c) => a + c.price_per_g * c.weight_g, 0);
+  const itemDisc     = cart.reduce((a, c) => a + (c.price_per_g * c.weight_g - itemNet(c)), 0);
+  const afterItemDisc = itemSubtotal - itemDisc;
+  const billDiscAmt  = billDiscOpen && billDiscVal
+    ? billDiscType === 'pct' ? afterItemDisc * parseFloat(billDiscVal) / 100
+    : Math.min(parseFloat(billDiscVal), afterItemDisc)
+    : 0;
+  const grand = Math.max(0, afterItemDisc - billDiscAmt);
+
+  async function checkout() {
+    if (!cart.length) return;
+    setLoading(true);
+    try {
+      const { data: txn, error: txnErr } = await db.from('transactions').insert({
+        txn_code: txnCode(),
+        customer_id: customer?.id || null,
+        payment_method: payMethod,
+        subtotal: itemSubtotal,
+        discount_item: itemDisc,
+        discount_bill: billDiscAmt,
+        discount_note: billDiscNote || null,
+        grand_total: grand,
+        staff_name: 'พนักงาน',
+      }).select().single();
+      if (txnErr) throw txnErr;
+
+      const items = cart.map(c => ({
+        transaction_id: txn.id,
+        strain_id: c.strain_id,
+        strain_name: c.strain_name,
+        price_per_g: c.price_per_g,
+        weight_g: c.weight_g,
+        disc_type: c.disc_type !== 'none' ? c.disc_type : null,
+        disc_value: c.disc_value,
+        line_total: itemNet(c),
+      }));
+      const { error: itemErr } = await db.from('transaction_items').insert(items);
+      if (itemErr) throw itemErr;
+
+      setMsg({ type: 'ok', text: `ชำระเงินสำเร็จ ${fmt(grand)} — บิล ${txn.txn_code}` });
+      setCart([]); setCustomer(null); setBillDiscOpen(false); setBillDiscVal(''); setBillDiscNote('');
+      loadStrains();
+      setTimeout(() => setMsg(null), 4000);
+    } catch (e) {
+      setMsg({ type: 'err', text: 'เกิดข้อผิดพลาด: ' + e.message });
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="page">
+      {msg && <div className={`alert alert-${msg.type === 'ok' ? 'ok' : 'err'}`}>{msg.text}</div>}
+      <div className="pos-shell">
+        {/* STRAIN GRID */}
+        <div className="strain-area">
+          <div className="strain-tb">
+            <input className="strain-search" placeholder="ค้นหา strain..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+          </div>
+          {!strains.length
+            ? <div className="empty"><div className="empty-icon">🌿</div><p>ยังไม่มีสินค้า — เพิ่มได้ที่แท็บ สต็อก</p></div>
+            : <div className="sgrid">
+                {filtered.map(s => (
+                  <div key={s.id} className={`sc ${cart.find(c=>c.strain_id===s.id)?'sel':''} ${s.stock_g<=0?'disabled':''}`} onClick={()=>addToCart(s)}>
+                    <div className="sc-top">
+                      <span className={`pill ${typeCls[s.type]||'h'}`}>{typeLabel[s.type]||s.type}</span>
+                      <span className={`pill ${stockCls(s)}`}>{stockLabel(s)}</span>
+                    </div>
+                    <div className="sc-name">{s.name}</div>
+                    <div className="sc-sub">{s.thc_pct > 0 ? `THC ${s.thc_pct}%` : 'Full Spectrum'}</div>
+                    <div className="sc-ft">
+                      <span className="sc-price">{fmt(s.price_per_g)}/g</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+
+        {/* CART */}
+        <div className="cart">
+          {/* Customer picker */}
+          <div className="cust-bar">
+            {customer
+              ? <><span className="cust-tag">👤 {customer.name}</span><button className="btn btn-sm btn-outline" onClick={()=>setCustomer(null)}>ลบ</button></>
+              : <><span style={{fontSize:11,color:'var(--muted)'}}>ลูกค้า:</span>
+                  <select style={{flex:1,fontSize:12,padding:'4px 8px',border:'1px solid var(--border)',borderRadius:6}} onChange={e=>{ const c=customers.find(x=>x.id===e.target.value); setCustomer(c||null); }}>
+                    <option value="">ลูกค้าทั่วไป</option>
+                    {customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </>
+            }
+          </div>
+
+          <div className="cart-hd">
+            <h3>ตะกร้า ({cart.length})</h3>
+            <button className="btn btn-sm btn-outline" onClick={()=>setCart([])}>ล้าง</button>
+          </div>
+
+          <div className="cart-body">
+            {!cart.length
+              ? <div className="empty" style={{padding:'30px 10px'}}><div className="empty-icon">🛒</div><p style={{fontSize:12}}>แตะ strain เพื่อเพิ่ม</p></div>
+              : cart.map(ci => {
+                  const base = ci.price_per_g * ci.weight_g;
+                  const net  = itemNet(ci);
+                  const saved = base - net;
+                  return (
+                    <div key={ci.strain_id} className="ci">
+                      <div className="ci-main">
+                        <div className="ci-info">
+                          <div className="ci-name">{ci.strain_name}</div>
+                          <div className="ci-unit">{fmt(ci.price_per_g)}/g</div>
+                        </div>
+                        <input className="gram-in" type="number" min={0.5} step={0.5} value={ci.weight_g}
+                          onChange={e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) removeCart(ci.strain_id); else updateCart(ci.strain_id,'weight_g',v); }} />
+                        <div className="ci-price">
+                          {saved > 0
+                            ? <><div style={{fontSize:10,color:'var(--muted)',textDecoration:'line-through'}}>{fmt(base)}</div>
+                                <div style={{color:'var(--purple)',fontWeight:700}}>{fmt(net)}</div></>
+                            : fmt(net)
+                          }
+                        </div>
+                        <button className="disc-btn" onClick={()=>updateCart(ci.strain_id,'discOpen',!ci.discOpen)}>
+                          {ci.discOpen ? '✕' : 'ลด'}
+                        </button>
+                        <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:16}} onClick={()=>removeCart(ci.strain_id)}>×</button>
+                      </div>
+                      {ci.discOpen && (
+                        <div className="ci-disc">
+                          <select className="disc-sel" value={ci.disc_type} onChange={e=>updateCart(ci.strain_id,'disc_type',e.target.value)}>
+                            <option value="none">ไม่มีส่วนลด</option>
+                            <option value="pct">% ลด</option>
+                            <option value="baht">฿ ลดจากยอด</option>
+                            <option value="price_per_g">ราคา/g พิเศษ</option>
+                          </select>
+                          {ci.disc_type !== 'none' &&
+                            <input className="disc-in" type="number" min={0} value={ci.disc_value||''}
+                              placeholder={ci.disc_type==='pct'?'เช่น 10':ci.disc_type==='baht'?'เช่น 50':'ราคา/g'}
+                              onChange={e=>updateCart(ci.strain_id,'disc_value',parseFloat(e.target.value)||0)} />
+                          }
+                          {saved > 0 && <span className="disc-saved">ลด {fmt(saved)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+            }
+          </div>
+
+          {cart.length > 0 && <>
+            <div className="bill-disc">
+              <div className="bill-disc-hd">
+                <span>ส่วนลดทั้งบิล</span>
+                <button className="disc-btn" onClick={()=>setBillDiscOpen(v=>!v)}>{billDiscOpen?'✕ ยกเลิก':'+ เพิ่ม'}</button>
+              </div>
+              {billDiscOpen && (
+                <div className="bill-disc-row">
+                  <select className="disc-sel" value={billDiscType} onChange={e=>setBillDiscType(e.target.value)}>
+                    <option value="pct">% ลด</option>
+                    <option value="baht">฿ ลด</option>
+                  </select>
+                  <input className="disc-in" style={{flex:1}} type="number" min={0} placeholder="0" value={billDiscVal} onChange={e=>setBillDiscVal(e.target.value)} />
+                  <input style={{flex:2,padding:'4px 8px',border:'1px solid var(--border)',borderRadius:6,fontSize:11}} placeholder="โน้ต เช่น โปรซื้อ 10g" value={billDiscNote} onChange={e=>setBillDiscNote(e.target.value)} />
+                </div>
+              )}
+            </div>
+            <div className="totals">
+              <div className="tr muted"><span>ยอดรวม</span><span>{fmt(itemSubtotal)}</span></div>
+              {itemDisc > 0 && <div className="tr disc"><span>ส่วนลดสินค้า</span><span>-{fmt(itemDisc)}</span></div>}
+              {billDiscAmt > 0 && <div className="tr disc"><span>ส่วนลดทั้งบิล{billDiscNote?' ('+billDiscNote+')':''}</span><span>-{fmt(billDiscAmt)}</span></div>}
+              <div className="tr big"><span>รวม</span><span>{fmt(grand)}</span></div>
+            </div>
+            <div className="pay-row">
+              {[['cash','💵 เงินสด'],['qr','📱 QR'],['card','💳 บัตร']].map(([v,l])=>(
+                <button key={v} className={`pb ${payMethod===v?'on':''}`} onClick={()=>setPayMethod(v)}>{l}</button>
+              ))}
+            </div>
+          </>}
+          <button className="pay-btn" onClick={checkout} disabled={!cart.length || loading}>
+            {loading ? 'กำลังบันทึก...' : `ชำระเงิน ${fmt(grand)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── STOCK / STRAIN MANAGEMENT ────────────────────────────────
+function StockView({ db }) {
+  const [strains, setStrains]     = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [lots, setLots]           = useState([]);
+  const [modal, setModal]         = useState(null); // 'strain' | 'lot'
+  const [editing, setEditing]     = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const [msg, setMsg]             = useState(null);
+  const [tab, setTab]             = useState('strains'); // 'strains' | 'lots'
+
+  const initStrain = { name:'', type:'sativa', thc_pct:'', cbd_pct:'', price_per_g:'', max_stock_g:'100', is_active:true };
+  const initLot    = { strain_id:'', supplier_id:'', received_date:today(), weight_g:'', cost_per_g:'', thc_lab:'', cbd_lab:'', coa_number:'', coa_lab_name:'', expiry_date:'', note:'' };
+  const [form, setForm] = useState(initStrain);
+
+  useEffect(()=>{ load(); },[]);
+
+  async function load() {
+    const [s, sup, l] = await Promise.all([
+      db.from('strains').select('*').order('name'),
+      db.from('suppliers').select('*').order('name'),
+      db.from('inventory_lots').select('*,strains(name),suppliers(name)').order('created_at',{ascending:false}).limit(50),
+    ]);
+    if (s.data)   setStrains(s.data);
+    if (sup.data) setSuppliers(sup.data);
+    if (l.data)   setLots(l.data);
+  }
+
+  const set = (f, v) => setForm(p => ({ ...p, [f]: v }));
+
+  async function saveStrain() {
+    setLoading(true);
+    const payload = {
+      name: form.name, type: form.type,
+      thc_pct: parseFloat(form.thc_pct)||0, cbd_pct: parseFloat(form.cbd_pct)||0,
+      price_per_g: parseFloat(form.price_per_g),
+      max_stock_g: parseFloat(form.max_stock_g)||100,
+      is_active: form.is_active,
+    };
+    let error;
+    if (editing) { ({ error } = await db.from('strains').update(payload).eq('id',editing.id)); }
+    else { ({ error } = await db.from('strains').insert(payload)); }
+    if (error) setMsg({ type:'err', text: error.message });
+    else { setMsg({ type:'ok', text: editing ? 'อัปเดตสำเร็จ' : 'เพิ่ม strain สำเร็จ' }); setModal(null); load(); }
+    setLoading(false);
+    setTimeout(()=>setMsg(null), 3000);
+  }
+
+  async function saveLot() {
+    if (!form.strain_id || !form.weight_g) return;
+    setLoading(true);
+    const { error } = await db.from('inventory_lots').insert({
+      lot_code: lotCode(),
+      strain_id: form.strain_id,
+      supplier_id: form.supplier_id || null,
+      received_date: form.received_date,
+      weight_g: parseFloat(form.weight_g),
+      cost_per_g: parseFloat(form.cost_per_g)||null,
+      thc_lab: parseFloat(form.thc_lab)||null,
+      cbd_lab: parseFloat(form.cbd_lab)||null,
+      coa_number: form.coa_number||null,
+      coa_lab_name: form.coa_lab_name||null,
+      expiry_date: form.expiry_date||null,
+      note: form.note||null,
+    });
+    if (error) setMsg({ type:'err', text: error.message });
+    else { setMsg({ type:'ok', text: 'รับสินค้าเข้าสำเร็จ — stock อัปเดตแล้ว' }); setModal(null); load(); }
+    setLoading(false);
+    setTimeout(()=>setMsg(null), 3000);
+  }
+
+  async function toggleActive(s) {
+    await db.from('strains').update({ is_active: !s.is_active }).eq('id', s.id);
+    load();
+  }
+
+  return (
+    <div className="page">
+      {msg && <div className={`alert alert-${msg.type==='ok'?'ok':'err'}`}>{msg.text}</div>}
+
+      <div className="page-title">
+        จัดการสต็อก
+        <div style={{display:'flex',gap:8,marginLeft:'auto'}}>
+          <button className="btn btn-blue" onClick={()=>{ setForm(initLot); setEditing(null); setModal('lot'); }}>+ รับสินค้าเข้า (Lot)</button>
+          <button className="btn btn-primary" onClick={()=>{ setForm(initStrain); setEditing(null); setModal('strain'); }}>+ เพิ่ม Strain</button>
+        </div>
+      </div>
+
+      <div style={{display:'flex',gap:8,marginBottom:16}}>
+        <button className={`btn ${tab==='strains'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('strains')}>Strains</button>
+        <button className={`btn ${tab==='lots'?'btn-blue':'btn-outline'}`} onClick={()=>setTab('lots')}>ประวัติรับสินค้า (Lots)</button>
+      </div>
+
+      {tab === 'strains' && (
+        <div className="card">
+          <table>
+            <thead><tr><th>Strain</th><th>ประเภท</th><th>THC%</th><th>CBD%</th><th>ราคา/g</th><th>สต็อก</th><th>สถานะ</th><th>แก้ไข</th></tr></thead>
+            <tbody>
+              {!strains.length && <tr><td colSpan={8} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ยังไม่มีข้อมูล</td></tr>}
+              {strains.map(s => {
+                const pct = Math.min(100, Math.round((s.stock_g / (s.max_stock_g||1)) * 100));
+                const cls = stockCls(s);
+                return (
+                  <tr key={s.id}>
+                    <td style={{fontWeight:600}}>{s.name}</td>
+                    <td><span className={`pill ${typeCls[s.type]||'h'}`}>{typeLabel[s.type]||s.type}</span></td>
+                    <td>{s.thc_pct > 0 ? s.thc_pct + '%' : '—'}</td>
+                    <td>{s.cbd_pct > 0 ? s.cbd_pct + '%' : '—'}</td>
+                    <td>{fmt(s.price_per_g)}</td>
+                    <td>
+                      <span className={`pill ${cls}`} style={{marginRight:8}}>{stockLabel(s)}</span>
+                      <span className="bar-wrap"><span className="bar" style={{width:pct+'%',background:cls==='ok'?'var(--green)':cls==='low'?'var(--amber)':'var(--red)'}}></span></span>
+                    </td>
+                    <td><span className={`pill ${s.is_active?'ok':'out'}`}>{s.is_active?'Active':'ปิด'}</span></td>
+                    <td>
+                      <div style={{display:'flex',gap:6}}>
+                        <button className="btn btn-sm btn-outline" onClick={()=>{ setForm({...s,thc_pct:s.thc_pct||'',cbd_pct:s.cbd_pct||''}); setEditing(s); setModal('strain'); }}>แก้ไข</button>
+                        <button className="btn btn-sm btn-outline" onClick={()=>toggleActive(s)}>{s.is_active?'ปิด':'เปิด'}</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'lots' && (
+        <div className="card">
+          <table>
+            <thead><tr><th>Lot Code</th><th>Strain</th><th>Supplier</th><th>วันรับ</th><th>น้ำหนัก</th><th>ต้นทุน/g</th><th>THC Lab</th><th>COA</th><th>หมดอายุ</th></tr></thead>
+            <tbody>
+              {!lots.length && <tr><td colSpan={9} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ยังไม่มีประวัติ</td></tr>}
+              {lots.map(l => (
+                <tr key={l.id}>
+                  <td style={{fontFamily:'monospace',fontSize:11}}>{l.lot_code}</td>
+                  <td style={{fontWeight:600}}>{l.strains?.name || '—'}</td>
+                  <td>{l.suppliers?.name || '—'}</td>
+                  <td>{l.received_date}</td>
+                  <td>{l.weight_g}g</td>
+                  <td>{l.cost_per_g ? fmt(l.cost_per_g) : '—'}</td>
+                  <td>{l.thc_lab ? l.thc_lab + '%' : '—'}</td>
+                  <td>{l.coa_number ? <span className="coa-badge">COA: {l.coa_number}</span> : <span style={{color:'var(--muted)',fontSize:11}}>ไม่มี</span>}</td>
+                  <td>{l.expiry_date || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* MODAL STRAIN */}
+      {modal === 'strain' && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="modal">
+            <div className="modal-hd">
+              <h3>{editing ? 'แก้ไข Strain' : 'เพิ่ม Strain ใหม่'}</h3>
+              <button className="close-btn" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div><label>ชื่อ Strain *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="เช่น Blue Dream" /></div>
+                <div className="form-grid form-grid-2">
+                  <div><label>ประเภท</label>
+                    <select value={form.type} onChange={e=>set('type',e.target.value)}>
+                      <option value="sativa">Sativa</option><option value="indica">Indica</option>
+                      <option value="hybrid">Hybrid</option><option value="cbd">CBD</option>
+                    </select>
+                  </div>
+                  <div><label>ราคา/กรัม (฿) *</label><input type="number" value={form.price_per_g} onChange={e=>set('price_per_g',e.target.value)} placeholder="450" /></div>
+                </div>
+                <div className="form-grid form-grid-3">
+                  <div><label>THC%</label><input type="number" value={form.thc_pct} onChange={e=>set('thc_pct',e.target.value)} placeholder="22" /></div>
+                  <div><label>CBD%</label><input type="number" value={form.cbd_pct} onChange={e=>set('cbd_pct',e.target.value)} placeholder="1" /></div>
+                  <div><label>Max Stock (g)</label><input type="number" value={form.max_stock_g} onChange={e=>set('max_stock_g',e.target.value)} /></div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={()=>setModal(null)}>ยกเลิก</button>
+              <button className="btn btn-primary" onClick={saveStrain} disabled={loading||!form.name||!form.price_per_g}>
+                {loading ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LOT */}
+      {modal === 'lot' && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="modal">
+            <div className="modal-hd">
+              <h3>รับสินค้าเข้า — Lot / COA</h3>
+              <button className="close-btn" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info" style={{marginBottom:14}}>สต็อกจะเพิ่มอัตโนมัติหลังบันทึก Lot</div>
+              <div className="form-grid">
+                <div className="form-grid form-grid-2">
+                  <div><label>Strain *</label>
+                    <select value={form.strain_id} onChange={e=>set('strain_id',e.target.value)}>
+                      <option value="">เลือก strain...</option>
+                      {strains.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div><label>ผู้จัดจำหน่าย (Supplier)</label>
+                    <select value={form.supplier_id} onChange={e=>set('supplier_id',e.target.value)}>
+                      <option value="">ไม่ระบุ</option>
+                      {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-grid form-grid-2">
+                  <div><label>วันที่รับสินค้า</label><input type="date" value={form.received_date} onChange={e=>set('received_date',e.target.value)} /></div>
+                  <div><label>น้ำหนักรับเข้า (กรัม) *</label><input type="number" value={form.weight_g} onChange={e=>set('weight_g',e.target.value)} placeholder="เช่น 50" /></div>
+                </div>
+                <div className="form-grid form-grid-2">
+                  <div><label>ต้นทุน/กรัม (฿)</label><input type="number" value={form.cost_per_g} onChange={e=>set('cost_per_g',e.target.value)} placeholder="เช่น 200" /></div>
+                  <div><label>วันหมดอายุ</label><input type="date" value={form.expiry_date} onChange={e=>set('expiry_date',e.target.value)} /></div>
+                </div>
+                <div style={{borderTop:'1px solid var(--border)',paddingTop:14}}>
+                  <div style={{fontSize:12,fontWeight:600,color:'var(--blue)',marginBottom:10}}>📋 ข้อมูล COA (Certificate of Analysis)</div>
+                  <div className="form-grid form-grid-2">
+                    <div><label>เลขที่ COA</label><input value={form.coa_number} onChange={e=>set('coa_number',e.target.value)} placeholder="เช่น COA-2024-1234" /></div>
+                    <div><label>ชื่อ Lab</label><input value={form.coa_lab_name} onChange={e=>set('coa_lab_name',e.target.value)} placeholder="เช่น ChemAnalysis Lab" /></div>
+                  </div>
+                  <div className="form-grid form-grid-2" style={{marginTop:10}}>
+                    <div><label>THC% (จาก Lab)</label><input type="number" value={form.thc_lab} onChange={e=>set('thc_lab',e.target.value)} placeholder="เช่น 22.5" /></div>
+                    <div><label>CBD% (จาก Lab)</label><input type="number" value={form.cbd_lab} onChange={e=>set('cbd_lab',e.target.value)} placeholder="เช่น 1.2" /></div>
+                  </div>
+                </div>
+                <div><label>โน้ตเพิ่มเติม</label><textarea value={form.note} onChange={e=>set('note',e.target.value)} placeholder="หมายเหตุ..." /></div>
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={()=>setModal(null)}>ยกเลิก</button>
+              <button className="btn btn-blue" onClick={saveLot} disabled={loading||!form.strain_id||!form.weight_g}>
+                {loading ? 'กำลังบันทึก...' : 'รับสินค้าเข้า'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CUSTOMERS VIEW ───────────────────────────────────────────
+function CustomersView({ db }) {
+  const [customers, setCustomers] = useState([]);
+  const [history, setHistory]     = useState([]);
+  const [modal, setModal]         = useState(null); // 'form' | 'history'
+  const [editing, setEditing]     = useState(null);
+  const [selected, setSelected]   = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const [msg, setMsg]             = useState(null);
+  const [searchQ, setSearchQ]     = useState('');
+  const init = { name:'', id_card:'', birth_date:'', phone:'', note:'' };
+  const [form, setForm] = useState(init);
+
+  useEffect(()=>{ load(); },[]);
+
+  async function load() {
+    const { data } = await db.from('customers').select('*').order('name');
+    if (data) setCustomers(data);
+  }
+
+  async function loadHistory(cid) {
+    const { data } = await db.from('transactions')
+      .select('txn_code,grand_total,payment_method,created_at,transaction_items(strain_name,weight_g,line_total)')
+      .eq('customer_id', cid).order('created_at',{ascending:false}).limit(20);
+    if (data) setHistory(data);
+  }
+
+  const set = (f,v) => setForm(p=>({...p,[f]:v}));
+  const filtered = customers.filter(c =>
+    c.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+    (c.phone && c.phone.includes(searchQ)) ||
+    (c.id_card && c.id_card.includes(searchQ))
+  );
+
+  function calcAge(bd) {
+    if (!bd) return null;
+    const diff = Date.now() - new Date(bd).getTime();
+    return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  }
+
+  async function save() {
+    const age = calcAge(form.birth_date);
+    if (age !== null && age < 20) { setMsg({type:'err',text:'ลูกค้าต้องอายุ 20 ปีขึ้นไป'}); return; }
+    setLoading(true);
+    const payload = { name:form.name, id_card:form.id_card||null, birth_date:form.birth_date||null, phone:form.phone||null, note:form.note||null };
+    let error;
+    if (editing) { ({error} = await db.from('customers').update(payload).eq('id',editing.id)); }
+    else { ({error} = await db.from('customers').insert(payload)); }
+    if (error) setMsg({type:'err',text:error.message});
+    else { setMsg({type:'ok',text:editing?'อัปเดตสำเร็จ':'เพิ่มลูกค้าสำเร็จ'}); setModal(null); load(); }
+    setLoading(false);
+    setTimeout(()=>setMsg(null),3000);
+  }
+
+  return (
+    <div className="page">
+      {msg && <div className={`alert alert-${msg.type==='ok'?'ok':'err'}`}>{msg.text}</div>}
+
+      <div className="page-title">
+        ข้อมูลลูกค้า
+        <button className="btn btn-primary" style={{marginLeft:'auto'}} onClick={()=>{ setForm(init); setEditing(null); setModal('form'); }}>+ เพิ่มลูกค้า</button>
+      </div>
+
+      <div className="stats">
+        <div className="stat"><div className="stat-label">ลูกค้าทั้งหมด</div><div className="stat-val">{customers.length}</div></div>
+        <div className="stat"><div className="stat-label">ยอดรวมสะสม</div><div className="stat-val" style={{fontSize:18}}>{fmt(customers.reduce((a,c)=>a+(c.total_spent||0),0))}</div></div>
+        <div className="stat"><div className="stat-label">เฉลี่ยต่อคน</div><div className="stat-val" style={{fontSize:18}}>{customers.length?fmt(customers.reduce((a,c)=>a+(c.total_spent||0),0)/customers.length):'฿0'}</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-hd">
+          <h3>รายชื่อลูกค้า</h3>
+          <input style={{width:220,padding:'6px 10px',border:'1px solid var(--border)',borderRadius:7,fontSize:12}} placeholder="ค้นหาชื่อ, เบอร์, บัตร..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+        </div>
+        <table>
+          <thead><tr><th>ชื่อ</th><th>อายุ</th><th>เบอร์โทร</th><th>จำนวนครั้ง</th><th>ยอดสะสม</th><th>หมายเหตุ</th><th></th></tr></thead>
+          <tbody>
+            {!filtered.length && <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ไม่พบข้อมูล</td></tr>}
+            {filtered.map(c => {
+              const age = calcAge(c.birth_date);
+              return (
+                <tr key={c.id}>
+                  <td>
+                    <div style={{fontWeight:600}}>{c.name}</div>
+                    {c.id_card && <div style={{fontSize:10,color:'var(--muted)'}}>บัตร: ****{c.id_card.slice(-4)}</div>}
+                  </td>
+                  <td>{age !== null ? <span className={`pill ${age>=20?'ok':'out'}`}>{age} ปี</span> : '—'}</td>
+                  <td>{c.phone || '—'}</td>
+                  <td>{c.visit_count} ครั้ง</td>
+                  <td style={{fontWeight:600,color:'var(--green)'}}>{fmt(c.total_spent)}</td>
+                  <td style={{fontSize:11,color:'var(--muted)'}}>{c.note||'—'}</td>
+                  <td>
+                    <div style={{display:'flex',gap:6}}>
+                      <button className="btn btn-sm btn-outline" onClick={()=>{ setEditing(c); setForm({...c,birth_date:c.birth_date||''}); setModal('form'); }}>แก้ไข</button>
+                      <button className="btn btn-sm btn-blue" onClick={()=>{ setSelected(c); loadHistory(c.id); setModal('history'); }}>ประวัติ</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* FORM MODAL */}
+      {modal === 'form' && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="modal">
+            <div className="modal-hd">
+              <h3>{editing?'แก้ไขข้อมูลลูกค้า':'เพิ่มลูกค้าใหม่'}</h3>
+              <button className="close-btn" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-warn" style={{marginBottom:14}}>ข้อมูลบัตรประชาชนถูกเก็บรักษาตาม PDPA — ใช้เพื่อยืนยันตัวตนเท่านั้น</div>
+              <div className="form-grid">
+                <div><label>ชื่อ-นามสกุล *</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="ชื่อลูกค้า" /></div>
+                <div className="form-grid form-grid-2">
+                  <div><label>เลขบัตรประชาชน</label><input value={form.id_card} onChange={e=>set('id_card',e.target.value)} placeholder="1-xxxx-xxxxx-xx-x" maxLength={13} /></div>
+                  <div><label>วันเกิด (ยืนยันอายุ ≥ 20 ปี)</label>
+                    <input type="date" value={form.birth_date} onChange={e=>set('birth_date',e.target.value)} max={new Date(Date.now()-20*365.25*24*3600*1000).toISOString().split('T')[0]} />
+                    {form.birth_date && calcAge(form.birth_date) !== null &&
+                      <div style={{fontSize:11,marginTop:4,color:calcAge(form.birth_date)>=20?'var(--green)':'var(--red)'}}>
+                        อายุ {calcAge(form.birth_date)} ปี {calcAge(form.birth_date)<20?'— ❌ ต่ำกว่า 20 ปี':'— ✓'}
+                      </div>
+                    }
+                  </div>
+                </div>
+                <div><label>เบอร์โทรศัพท์</label><input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="08x-xxx-xxxx" /></div>
+                <div><label>หมายเหตุ</label><textarea value={form.note} onChange={e=>set('note',e.target.value)} placeholder="โน้ตเพิ่มเติม..." /></div>
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={()=>setModal(null)}>ยกเลิก</button>
+              <button className="btn btn-primary" onClick={save} disabled={loading||!form.name}>
+                {loading?'กำลังบันทึก...':'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HISTORY MODAL */}
+      {modal === 'history' && selected && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <div className="modal" style={{maxWidth:620}}>
+            <div className="modal-hd">
+              <h3>ประวัติการซื้อ — {selected.name}</h3>
+              <button className="close-btn" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{padding:0}}>
+              <table>
+                <thead><tr><th>วันที่</th><th>บิล</th><th>รายการ</th><th>จ่ายด้วย</th><th>ยอด</th></tr></thead>
+                <tbody>
+                  {!history.length && <tr><td colSpan={5} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ยังไม่มีประวัติ</td></tr>}
+                  {history.map(t=>(
+                    <tr key={t.id||t.txn_code}>
+                      <td style={{fontSize:11,whiteSpace:'nowrap'}}>{new Date(t.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</td>
+                      <td style={{fontFamily:'monospace',fontSize:10}}>{t.txn_code}</td>
+                      <td style={{fontSize:11}}>{(t.transaction_items||[]).map(i=>`${i.strain_name} ${i.weight_g}g`).join(', ')}</td>
+                      <td style={{fontSize:11}}>{t.payment_method==='cash'?'เงินสด':t.payment_method==='qr'?'QR':'บัตร'}</td>
+                      <td style={{fontWeight:600,color:'var(--green)'}}>{fmt(t.grand_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={()=>setModal(null)}>ปิด</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── REPORT VIEW ──────────────────────────────────────────────
+function ReportView({ db }) {
+  const [txns, setTxns] = useState([]);
+  const [range, setRange] = useState('today');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(()=>{ loadReport(); },[range]);
+
+  async function loadReport() {
+    setLoading(true);
+    let from = new Date();
+    if (range === 'today')   from.setHours(0,0,0,0);
+    if (range === 'week')    from.setDate(from.getDate()-7);
+    if (range === 'month')   from.setDate(1), from.setHours(0,0,0,0);
+
+    const { data } = await db.from('transactions')
+      .select('*,transaction_items(strain_name,weight_g,line_total),customers(name)')
+      .gte('created_at', from.toISOString())
+      .order('created_at',{ascending:false});
+    if (data) setTxns(data);
+    setLoading(false);
+  }
+
+  const total   = txns.reduce((a,t)=>a+(t.grand_total||0),0);
+  const discTot = txns.reduce((a,t)=>a+(t.discount_item||0)+(t.discount_bill||0),0);
+  const grams   = txns.flatMap(t=>t.transaction_items||[]).reduce((a,i)=>a+(i.weight_g||0),0);
+
+  // strain breakdown
+  const strainMap = {};
+  txns.forEach(t=>(t.transaction_items||[]).forEach(i=>{
+    strainMap[i.strain_name] = (strainMap[i.strain_name]||0) + i.weight_g;
+  }));
+  const topStrains = Object.entries(strainMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxG = Math.max(...topStrains.map(([,g])=>g), 1);
+
+  return (
+    <div className="page">
+      <div className="page-title">
+        รายงานยอดขาย
+        <div style={{display:'flex',gap:8,marginLeft:'auto'}}>
+          {[['today','วันนี้'],['week','7 วัน'],['month','เดือนนี้']].map(([v,l])=>(
+            <button key={v} className={`btn ${range===v?'btn-primary':'btn-outline'}`} onClick={()=>setRange(v)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="stats">
+        <div className="stat"><div className="stat-label">ยอดขาย</div><div className="stat-val">{fmt(total)}</div><div className="stat-sub">{txns.length} บิล</div></div>
+        <div className="stat"><div className="stat-label">เฉลี่ย/บิล</div><div className="stat-val" style={{fontSize:18}}>{txns.length?fmt(total/txns.length):'฿0'}</div></div>
+        <div className="stat"><div className="stat-label">ปริมาณขาย</div><div className="stat-val">{grams.toFixed(1)}g</div></div>
+        <div className="stat"><div className="stat-label">ส่วนลดรวม</div><div className="stat-val" style={{fontSize:18,color:'var(--purple)'}}>{fmt(discTot)}</div></div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+        <div className="card" style={{padding:18}}>
+          <div style={{fontWeight:600,marginBottom:14,fontSize:13,color:'var(--muted)'}}>Strain ขายดี (กรัม)</div>
+          {!topStrains.length ? <div style={{color:'var(--muted)',fontSize:12,textAlign:'center',padding:20}}>ยังไม่มีข้อมูล</div>
+            : topStrains.map(([name,g])=>(
+              <div key={name} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,fontSize:12}}>
+                <div style={{width:90,textAlign:'right',color:'var(--muted)',fontSize:11,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{name}</div>
+                <div style={{flex:1,height:8,background:'var(--faint)',borderRadius:4}}><div style={{width:Math.round(g/maxG*100)+'%',height:'100%',background:'var(--green)',borderRadius:4}}></div></div>
+                <div style={{fontWeight:600,width:48}}>{g.toFixed(1)}g</div>
+              </div>
+            ))
+          }
+        </div>
+        <div className="card" style={{padding:18}}>
+          <div style={{fontWeight:600,marginBottom:14,fontSize:13,color:'var(--muted)'}}>วิธีชำระเงิน</div>
+          {['cash','qr','card'].map(m=>{
+            const cnt = txns.filter(t=>t.payment_method===m).length;
+            const pct = txns.length ? Math.round(cnt/txns.length*100) : 0;
+            const label = m==='cash'?'💵 เงินสด':m==='qr'?'📱 QR':'💳 บัตร';
+            return (
+              <div key={m} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,fontSize:12}}>
+                <div style={{width:72}}>{label}</div>
+                <div style={{flex:1,height:8,background:'var(--faint)',borderRadius:4}}><div style={{width:pct+'%',height:'100%',background:'var(--blue)',borderRadius:4}}></div></div>
+                <div style={{fontWeight:600,width:50}}>{cnt} ({pct}%)</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-hd"><h3>รายการบิลล่าสุด</h3>{loading && <span className="spinner"></span>}</div>
+        <table>
+          <thead><tr><th>บิล</th><th>ลูกค้า</th><th>รายการ</th><th>ส่วนลด</th><th>ยอด</th><th>ชำระ</th><th>เวลา</th></tr></thead>
+          <tbody>
+            {!txns.length && <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)',padding:32}}>ยังไม่มีข้อมูลในช่วงนี้</td></tr>}
+            {txns.slice(0,30).map(t=>(
+              <tr key={t.id}>
+                <td style={{fontFamily:'monospace',fontSize:10}}>{t.txn_code}</td>
+                <td style={{fontSize:11}}>{t.customers?.name||'ทั่วไป'}</td>
+                <td style={{fontSize:11}}>{(t.transaction_items||[]).map(i=>`${i.strain_name} ${i.weight_g}g`).join(', ')}</td>
+                <td style={{color:'var(--purple)',fontSize:11}}>{(t.discount_item+t.discount_bill)>0?'-'+fmt(t.discount_item+t.discount_bill):'—'}</td>
+                <td style={{fontWeight:600,color:'var(--green)'}}>{fmt(t.grand_total)}</td>
+                <td><span className={`pill ${t.payment_method==='cash'?'ok':t.payment_method==='qr'?'s':'c'}`}>{t.payment_method==='cash'?'เงินสด':t.payment_method==='qr'?'QR':'บัตร'}</span></td>
+                <td style={{fontSize:10,color:'var(--muted)'}}>{new Date(t.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── ROOT APP ─────────────────────────────────────────────────
+function App() {
+  const [db, setDb]     = useState(null);
+  const [view, setView] = useState('pos');
+  const [clk, setClk]   = useState('');
+
+  useEffect(() => {
+    // auto-connect from localStorage
+    const url = localStorage.getItem('sb_url');
+    const key = localStorage.getItem('sb_key');
+    if (url && key) {
+      const client = getClient(url, key);
+      if (client) setDb(client);
+    }
+    const tick = () => { const n=new Date(); setClk(n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')); };
+    tick(); const t = setInterval(tick, 30000); return ()=>clearInterval(t);
+  }, []);
+
+  return (
+    <>
+      <div className="nav">
+        <div className="brand">GM.Weed POS</div>
+        <div className="nav-tabs" style={{display:'flex',gap:2}}>
+          {[['pos','🛒 ขาย'],['stock','📦 สต็อก'],['customers','👤 ลูกค้า'],['report','📊 รายงาน']].map(([v,l])=>(
+            <button key={v} className={`ntab ${view===v?'on':''}`} onClick={()=>setView(v)}>{l}</button>
+          ))}
+        </div>
+        <div className="nav-r">
+          <span className={`db-badge ${db?'db-ok':'db-err'}`}>{db?'🟢 DB Connected':'🔴 ไม่ได้เชื่อมต่อ'}</span>
+          <div className="dot"></div>
+          <div className="clk">{clk}</div>
+        </div>
+      </div>
+
+      {!db && <SetupBanner onConnect={(client)=>setDb(client)} />}
+
+      {db ? (
+        <>
+          {view === 'pos'       && <POSView       db={db} />}
+          {view === 'stock'     && <StockView     db={db} />}
+          {view === 'customers' && <CustomersView db={db} />}
+          {view === 'report'    && <ReportView    db={db} />}
+        </>
+      ) : (
+        <div className="page">
+          <div className="empty" style={{marginTop:60}}>
+            <div className="empty-icon">🔌</div>
+            <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>ยังไม่ได้เชื่อมต่อ Supabase</p>
+            <p style={{fontSize:13,color:'var(--muted)'}}>กรุณาใส่ Project URL และ API Key ด้านบน</p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
