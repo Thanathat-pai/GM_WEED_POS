@@ -186,6 +186,43 @@ textarea{resize:vertical;min-height:70px}
   .cart{border-top:1px solid var(--border)}
   .form-grid-2,.form-grid-3{grid-template-columns:1fr}
 }
+
+/* ── AUTH ─────────────────────────────────────────────────── */
+.auth-shell{min-height:calc(100vh - 52px);display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.08)}
+.auth-title{font-size:20px;font-weight:700;text-align:center;margin-bottom:4px}
+.auth-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:24px}
+
+/* Staff name list */
+.staff-list{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.staff-btn{padding:10px 16px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  font-size:13px;font-weight:500;text-align:left;cursor:pointer;transition:all 120ms;color:var(--text)}
+.staff-btn:hover{border-color:var(--green-m);background:var(--green-l)}
+.staff-btn.sel{border-color:var(--green);border-width:2px;background:var(--green-l);color:var(--green);font-weight:600}
+
+/* PIN dots */
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+.pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);background:var(--surface);transition:all 150ms}
+.pin-dot.filled{background:var(--green);border-color:var(--green)}
+.pin-dot.err{background:var(--red);border-color:var(--red)}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.shake{animation:shake .35s ease}
+
+/* Numpad */
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto}
+.numpad-key{padding:14px;border-radius:10px;font-size:18px;font-weight:600;
+  background:var(--faint);color:var(--text);cursor:pointer;text-align:center;
+  border:none;transition:all 100ms;user-select:none}
+.numpad-key:hover{background:var(--border)}
+.numpad-key:active{transform:scale(.94)}
+.numpad-key.del{background:var(--red-l);color:var(--red);font-size:14px}
+.numpad-key.del:hover{background:#fecaca}
+.numpad-key.empty{background:transparent;border:none;cursor:default}
+.pin-err{font-size:12px;color:var(--red);text-align:center;margin-bottom:10px;min-height:18px}
+
+/* Bootstrap extras */
+.auth-section{border-top:1px solid var(--border);padding-top:16px;margin-top:16px}
+.auth-section-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -1062,55 +1099,184 @@ function ReportView({ db }) {
 
 // ── ROOT APP ─────────────────────────────────────────────────
 function App() {
-  const [db, setDb]     = useState(null);
-  const [view, setView] = useState('pos');
-  const [clk, setClk]   = useState('');
+  const [db, setDb]           = useState(null);
+  const [view, setView]       = useState('pos');
+  const [clk, setClk]         = useState('');
+  // authState: 'loading' | 'bootstrap' | 'login' | 'ready' | 'error'
+  const [authState, setAuthState] = useState('loading');
+  const [currentStaff, setCurrentStaff] = useState(null);
+  const [authErr, setAuthErr]     = useState('');
 
+  // Clock tick
   useEffect(() => {
-    // auto-connect from localStorage
+    const tick = () => {
+      const n = new Date();
+      setClk(n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0'));
+    };
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-connect from localStorage on mount
+  useEffect(() => {
     const url = localStorage.getItem('sb_url');
     const key = localStorage.getItem('sb_key');
     if (url && key) {
       const client = getClient(url, key);
-      if (client) setDb(client);
+      if (client) handleDbReady(client);
     }
-    const tick = () => { const n=new Date(); setClk(n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')); };
-    tick(); const t = setInterval(tick, 30000); return ()=>clearInterval(t);
   }, []);
+
+  async function handleDbReady(client) {
+    setDb(client);
+    await runInitSequence(client);
+  }
+
+  async function runInitSequence(client) {
+    setAuthState('loading');
+    try {
+      // Step 2: Check if any active staff exist
+      const { count, error: countErr } = await client
+        .from('staff').select('*', { count: 'exact', head: true }).eq('is_active', true);
+      if (countErr) throw countErr;
+
+      if (count === 0) {
+        setAuthState('bootstrap');
+        return;
+      }
+
+      // Step 3: Validate existing session
+      const raw = localStorage.getItem('gm_staff');
+      if (!raw) { setAuthState('login'); return; }
+
+      let saved;
+      try { saved = JSON.parse(raw); } catch { localStorage.removeItem('gm_staff'); setAuthState('login'); return; }
+
+      const { data: staffRow, error: staffErr } = await client
+        .from('staff').select('id, name, role, is_active').eq('id', saved.id).single();
+
+      if (staffErr || !staffRow || !staffRow.is_active) {
+        localStorage.removeItem('gm_staff');
+        setAuthState('login');
+        return;
+      }
+
+      // role from DB overwrites localStorage (prevents tampering)
+      const validated = { id: staffRow.id, name: staffRow.name, role: staffRow.role };
+      localStorage.setItem('gm_staff', JSON.stringify(validated));
+      setCurrentStaff(validated);
+      setAuthState('ready');
+
+    } catch (e) {
+      setAuthErr(e.message || 'เชื่อมต่อไม่ได้');
+      setAuthState('error');
+    }
+  }
+
+  function handleLogin(staffObj) {
+    setCurrentStaff(staffObj);
+    setAuthState('ready');
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('gm_staff');
+    setCurrentStaff(null);
+    setView('pos');
+    setAuthState('login');
+  }
+
+  function handleBootstrapDone(staffObj) {
+    setCurrentStaff(staffObj);
+    setAuthState('ready');
+  }
+
+  // ── RENDER ───────────────────────────────────────────────────
+  const navTabs = [
+    { id:'pos',       label:'ขาย',      icon:'ShoppingCart' },
+    { id:'stock',     label:'สต็อก',    icon:'Package',   ownerOnly: true },
+    { id:'customers', label:'ลูกค้า',   icon:'Users' },
+    { id:'report',    label:'รายงาน',   icon:'BarChart2', ownerOnly: true },
+    { id:'staff',     label:'พนักงาน',  icon:'UserCog',   ownerOnly: true },
+  ];
+
+  const visibleTabs = navTabs.filter(t => !t.ownerOnly || currentStaff?.role === 'owner');
 
   return (
     <>
       <div className="nav">
         <div className="brand">GM.Weed POS</div>
-        <div className="nav-tabs" style={{display:'flex',gap:2}}>
-          {[['pos','🛒 ขาย'],['stock','📦 สต็อก'],['customers','👤 ลูกค้า'],['report','📊 รายงาน']].map(([v,l])=>(
-            <button key={v} className={`ntab ${view===v?'on':''}`} onClick={()=>setView(v)}>{l}</button>
-          ))}
-        </div>
+        {authState === 'ready' && (
+          <div style={{display:'flex',gap:2}}>
+            {visibleTabs.map(t => (
+              <button key={t.id} className={`ntab ${view===t.id?'on':''}`} onClick={()=>setView(t.id)}
+                      style={{display:'flex',alignItems:'center',gap:6}}>
+                <LucideIcon icon={t.icon} size={14}/>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="nav-r">
+          {authState === 'ready' && currentStaff && (
+            <>
+              <span style={{fontSize:12,color:'rgba(255,255,255,.55)'}}>
+                {currentStaff.name}
+                <span style={{marginLeft:6,fontSize:10,padding:'1px 7px',borderRadius:20,
+                  background:currentStaff.role==='owner'?'rgba(250,204,21,.2)':'rgba(74,222,128,.15)',
+                  color:currentStaff.role==='owner'?'#fbbf24':'#4ade80'}}>
+                  {currentStaff.role==='owner'?'Owner':'Staff'}
+                </span>
+              </span>
+              <button onClick={handleLogout} title="Logout"
+                      style={{background:'none',border:'none',color:'rgba(255,255,255,.4)',cursor:'pointer',
+                              display:'flex',alignItems:'center',gap:4,fontSize:12,padding:'4px 8px',
+                              borderRadius:6,transition:'color 120ms'}}
+                      onMouseEnter={e=>e.currentTarget.style.color='#f87171'}
+                      onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,.4)'}>
+                <LucideIcon icon="LogOut" size={14}/>
+              </button>
+            </>
+          )}
           <span className={`db-badge ${db?'db-ok':'db-err'}`}>{db?'🟢 DB Connected':'🔴 ไม่ได้เชื่อมต่อ'}</span>
-          <div className="dot"></div>
           <div className="clk">{clk}</div>
         </div>
       </div>
 
-      {!db && <SetupBanner onConnect={(client)=>setDb(client)} />}
+      {!db && <SetupBanner onConnect={handleDbReady} />}
 
-      {db ? (
+      {db && authState === 'loading' && (
+        <div className="page"><div className="empty" style={{marginTop:80}}>
+          <div className="spinner" style={{width:32,height:32,borderWidth:3}}></div>
+          <p style={{marginTop:16,color:'var(--muted)'}}>กำลังตรวจสอบ...</p>
+        </div></div>
+      )}
+
+      {db && authState === 'error' && (
+        <div className="page"><div className="empty" style={{marginTop:80}}>
+          <div className="empty-icon">⚠️</div>
+          <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>ไม่สามารถเชื่อมต่อฐานข้อมูลได้</p>
+          <p style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>{authErr}</p>
+          <button className="btn btn-primary" onClick={()=>runInitSequence(db)}>ลองใหม่</button>
+        </div></div>
+      )}
+
+      {db && authState === 'bootstrap' && (
+        <BootstrapScreen db={db} onDone={handleBootstrapDone} />
+      )}
+
+      {db && authState === 'login' && (
+        <LoginScreen db={db} onLogin={handleLogin} />
+      )}
+
+      {db && authState === 'ready' && (
         <>
-          {view === 'pos'       && <POSView       db={db} />}
+          {view === 'pos'       && <POSView       db={db} currentStaff={currentStaff} />}
           {view === 'stock'     && <StockView     db={db} />}
           {view === 'customers' && <CustomersView db={db} />}
           {view === 'report'    && <ReportView    db={db} />}
+          {view === 'staff'     && <StaffView     db={db} />}
         </>
-      ) : (
-        <div className="page">
-          <div className="empty" style={{marginTop:60}}>
-            <div className="empty-icon">🔌</div>
-            <p style={{fontSize:15,fontWeight:600,marginBottom:8}}>ยังไม่ได้เชื่อมต่อ Supabase</p>
-            <p style={{fontSize:13,color:'var(--muted)'}}>กรุณาใส่ Project URL และ API Key ด้านบน</p>
-          </div>
-        </div>
       )}
     </>
   );
