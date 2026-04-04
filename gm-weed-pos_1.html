@@ -1138,7 +1138,7 @@ function App() {
     try {
       // Step 2: Check if any active staff exist
       const { count, error: countErr } = await client
-        .from('staff').select('*', { count: 'exact', head: true }).eq('is_active', true);
+        .from('staff').select('*', { count: 'exact', head: true });
       if (countErr) throw countErr;
 
       if (count === 0) {
