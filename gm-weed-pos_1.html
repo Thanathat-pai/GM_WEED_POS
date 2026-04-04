@@ -573,7 +573,6 @@ function LoginScreen({ db, onLogin }) {
   const [errMsg, setErrMsg]         = useState('');
   const [shaking, setShaking]       = useState(false);
   const [loading, setLoading]       = useState(false);
-  const dotsRef = useRef(null);
 
   useEffect(() => { loadStaff(); }, []);
 
@@ -615,6 +614,7 @@ function LoginScreen({ db, onLogin }) {
         const session = { id: staffRow.id, name: staffRow.name, role: staffRow.role };
         localStorage.setItem('gm_staff', JSON.stringify(session));
         onLogin(session);
+        return;
       } catch (e) {
         triggerError(e.message || 'PIN ไม่ถูกต้อง');
       }
@@ -658,7 +658,7 @@ function LoginScreen({ db, onLogin }) {
 
         {selected && (
           <>
-            <div className={`pin-dots ${shaking?'shake':''}`} ref={dotsRef}>
+            <div className={`pin-dots ${shaking?'shake':''}`}>
               {[0,1,2,3].map(i => (
                 <div key={i} className={`pin-dot ${i < pin.length ? (errMsg?'err':'filled') : ''}`}/>
               ))}
@@ -735,6 +735,7 @@ function BootstrapScreen({ db, onDone }) {
       const session = { id: data.id, name: data.name, role: data.role };
       localStorage.setItem('gm_staff', JSON.stringify(session));
       onDone(session);
+      return;
     } catch(e) {
       setErrMsg(e.message || 'เกิดข้อผิดพลาด');
     }
