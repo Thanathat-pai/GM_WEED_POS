@@ -233,6 +233,10 @@ const { useState, useEffect, useCallback, useRef } = React;
 const { createClient } = supabase;
 
 // ── SUPABASE CLIENT ─────────────────────────────────────────
+// 👇 ใส่ค่าจริงจาก Supabase Dashboard → Project Settings → API
+const SUPABASE_URL = 'https://pqzktyhsjkoimaupybfb.supabase.co/';
+const SUPABASE_KEY = 'sb_publishable_uCERZBaAxwieHGsP3ZTtWA_5uEahK2u';
+
 let sb = null;
 function getClient(url, key) {
   if (!url || !key) return null;
@@ -1568,14 +1572,10 @@ function App() {
     return () => clearInterval(t);
   }, []);
 
-  // Auto-connect from localStorage on mount
+  // Auto-connect using hardcoded credentials on mount
   useEffect(() => {
-    const url = localStorage.getItem('sb_url');
-    const key = localStorage.getItem('sb_key');
-    if (url && key) {
-      const client = getClient(url, key);
-      if (client) handleDbReady(client);
-    }
+    const client = getClient(SUPABASE_URL, SUPABASE_KEY);
+    if (client) handleDbReady(client);
   }, []);
 
   async function handleDbReady(client) {
