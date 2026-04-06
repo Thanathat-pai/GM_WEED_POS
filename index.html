@@ -287,6 +287,8 @@ const { useState, useEffect, useCallback, useRef } = React;
 const { createClient } = supabase;
 
 // ── SUPABASE CLIENT ─────────────────────────────────────────
+const SUPABASE_URL = 'https://pqzktyhsjkoimaupybfb.supabase.co/';
+const SUPABASE_KEY = 'sb_publishable_uCERZBaAxwieHGsP3ZTtWA_5uEahK2u';
 let sb = null;
 function getClient(url, key) {
   if (!url || !key) return null;
@@ -1633,14 +1635,14 @@ function App() {
     return () => clearInterval(t);
   }, []);
 
-  // Auto-connect from localStorage on mount
+  // Auto-connect: ใช้ hardcoded credentials เป็น default
   useEffect(() => {
-    const url = localStorage.getItem('sb_url');
-    const key = localStorage.getItem('sb_key');
-    if (url && key) {
-      const client = getClient(url, key);
-      if (client) handleDbReady(client);
-    }
+    const url = localStorage.getItem('sb_url') || SUPABASE_URL;
+    const key = localStorage.getItem('sb_key') || SUPABASE_KEY;
+    localStorage.setItem('sb_url', url);
+    localStorage.setItem('sb_key', key);
+    const client = getClient(url, key);
+    if (client) handleDbReady(client);
   }, []);
 
   async function handleDbReady(client) {
