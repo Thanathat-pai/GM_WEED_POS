@@ -181,10 +181,64 @@ textarea{resize:vertical;min-height:70px}
 /* COA BADGE */
 .coa-badge{font-size:10px;padding:2px 8px;border-radius:4px;background:var(--blue-l);color:var(--blue);font-weight:500}
 
+/* ── MOBILE RESPONSIVE ─────────────────────────────────────── */
 @media(max-width:768px){
-  .pos-shell{grid-template-columns:1fr}
-  .cart{border-top:1px solid var(--border)}
+  /* NAV: เลื่อนได้แนวนอน ไม่ overflow */
+  .nav{padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px;flex-shrink:0}
+  .nav::-webkit-scrollbar{display:none}
+  .brand{font-size:12px;margin-right:8px;flex-shrink:0;letter-spacing:0}
+  .ntab{padding:5px 10px;font-size:12px;flex-shrink:0}
+  .nav-r{flex-shrink:0;gap:6px}
+  .clk{display:none}
+  .db-badge{font-size:9px;padding:2px 7px}
+
+  /* SETUP BANNER */
+  .setup-banner{flex-direction:column;padding:12px 14px;gap:8px}
+  .setup-banner input{width:100%}
+  .setup-banner p{font-size:12px}
+
+  /* PAGE */
+  .page{padding:12px}
+  .page-title{font-size:15px;margin-bottom:12px}
+
+  /* STATS: 2 col บนมือถือ */
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+  .stat{padding:10px 12px}
+  .stat-val{font-size:18px}
+
+  /* POS SHELL */
+  .pos-shell{grid-template-columns:1fr;min-height:unset;border-radius:8px}
+  /* Strain area: เลื่อนได้ในตัว */
+  .strain-area{max-height:calc(100vh - 130px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* Cart: เต็มความสูง viewport เมื่อเปิดแท็บตะกร้า */
+  .cart{border-top:none;display:flex;flex-direction:column;max-height:calc(100vh - 130px)}
+  .cart-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:none}
+  /* ปิด bottom rounded บน modal ที่ขึ้นจากล่าง */
+  .pos-shell{border-bottom-left-radius:0;border-bottom-right-radius:0}
+
+  /* FORMS */
   .form-grid-2,.form-grid-3{grid-template-columns:1fr}
+
+  /* TABLE CARDS: เลื่อนได้แนวนอน */
+  .card{overflow-x:auto}
+  .card table{min-width:480px}
+
+  /* MODAL: ขึ้นจากด้านล่างบนมือถือ */
+  .overlay{padding:0;align-items:flex-end}
+  .modal{border-radius:16px 16px 0 0;max-height:92vh;max-width:100%}
+
+  /* MOBILE POS TAB TOGGLE */
+  .mob-pos-tabs{display:flex;border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:10px;background:var(--surface)}
+  .mob-tab{flex:1;padding:10px 8px;font-size:13px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 120ms;display:flex;align-items:center;justify-content:center;gap:6px}
+  .mob-tab.on{background:var(--green-l);color:var(--green);font-weight:600}
+  .mob-cart-badge{background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;min-width:18px;text-align:center}
+  /* ซ่อน panel ที่ไม่ active */
+  .pos-shell.mob-show-cart .strain-area{display:none}
+  .pos-shell:not(.mob-show-cart) .cart{display:none}
+}
+@media(min-width:769px){
+  /* ซ่อน mobile toggle บน desktop */
+  .mob-pos-tabs{display:none}
 }
 
 /* ── AUTH ─────────────────────────────────────────────────── */
@@ -350,6 +404,7 @@ function POSView({ db, currentStaff }) {
   const [loading, setLoading]     = useState(false);
   const [msg, setMsg]             = useState(null);
   const [showCustModal, setShowCustModal] = useState(false);
+  const [mobileTab, setMobileTab] = useState('strains');
 
   useEffect(() => { loadStrains(); loadCustomers(); }, []);
 
@@ -431,7 +486,17 @@ function POSView({ db, currentStaff }) {
   return (
     <div className="page">
       {msg && <div className={`alert alert-${msg.type === 'ok' ? 'ok' : 'err'}`}>{msg.text}</div>}
-      <div className="pos-shell">
+      {/* Mobile tab toggle — ซ่อนบน desktop ผ่าน CSS */}
+      <div className="mob-pos-tabs">
+        <button className={`mob-tab ${mobileTab==='strains'?'on':''}`} onClick={()=>setMobileTab('strains')}>
+          🌿 สินค้า
+        </button>
+        <button className={`mob-tab ${mobileTab==='cart'?'on':''}`} onClick={()=>setMobileTab('cart')}>
+          🛒 ตะกร้า
+          {cart.length > 0 && <span className="mob-cart-badge">{cart.length}</span>}
+        </button>
+      </div>
+      <div className={`pos-shell${mobileTab==='cart'?' mob-show-cart':''}`}>
         {/* STRAIN GRID */}
         <div className="strain-area">
           <div className="strain-tb">

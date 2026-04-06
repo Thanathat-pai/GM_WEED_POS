@@ -19,7 +19,7 @@
   --bg:#f8fafc;--surface:#ffffff;--border:#e2e8f0;
   --text:#1e293b;--muted:#64748b;--faint:#f1f5f9;
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
 
 /* NAV */
 .nav{display:flex;align-items:center;background:#111;padding:0 20px;height:52px;gap:4px;position:sticky;top:0;z-index:100}
@@ -117,10 +117,10 @@ textarea{resize:vertical;min-height:70px}
 .sc.sel{border-color:var(--green);border-width:2px;background:var(--green-l)}
 .sc.disabled{opacity:.5;cursor:not-allowed}
 .sc-top{display:flex;justify-content:space-between;margin-bottom:6px}
-.sc-name{font-size:14px;font-weight:600}
-.sc-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.sc-name{font-size:13px;font-weight:600}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .sc-ft{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-.sc-price{font-size:14px;font-weight:600;color:var(--green)}
+.sc-price{font-size:13px;font-weight:600;color:var(--green)}
 
 /* CART */
 .cart{display:flex;flex-direction:column;background:var(--surface)}
@@ -130,28 +130,28 @@ textarea{resize:vertical;min-height:70px}
 .ci{border:1px solid var(--border);border-radius:9px;margin-bottom:6px;overflow:hidden}
 .ci-main{display:flex;align-items:center;gap:8px;padding:8px 10px}
 .ci-info{flex:1}
-.ci-name{font-size:13px;font-weight:600}
-.ci-unit{font-size:11px;color:var(--muted)}
-.gram-in{width:58px;padding:5px 6px;border:1px solid var(--green-m);border-radius:6px;font-size:13px;text-align:center;background:var(--green-l);color:var(--text)}
-.ci-price{font-size:13px;font-weight:600;min-width:62px;text-align:right}
-.disc-btn{font-size:11px;color:var(--purple);background:var(--purple-l);border:none;border-radius:5px;padding:4px 9px;cursor:pointer}
+.ci-name{font-size:12px;font-weight:600}
+.ci-unit{font-size:10px;color:var(--muted)}
+.gram-in{width:54px;padding:4px 6px;border:1px solid var(--green-m);border-radius:6px;font-size:12px;text-align:center;background:var(--green-l);color:var(--text)}
+.ci-price{font-size:12px;font-weight:600;min-width:60px;text-align:right}
+.disc-btn{font-size:10px;color:var(--purple);background:var(--purple-l);border:none;border-radius:5px;padding:3px 8px;cursor:pointer}
 .ci-disc{padding:0 10px 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.disc-sel{padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--surface);color:var(--text)}
-.disc-in{width:72px;padding:4px 7px;border:1px solid var(--purple);border-radius:6px;font-size:12px;background:var(--purple-l);color:var(--purple);text-align:center}
-.disc-saved{font-size:11px;color:var(--purple);font-weight:600}
+.disc-sel{padding:3px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--text)}
+.disc-in{width:70px;padding:3px 7px;border:1px solid var(--purple);border-radius:6px;font-size:11px;background:var(--purple-l);color:var(--purple);text-align:center}
+.disc-saved{font-size:10px;color:var(--purple);font-weight:600}
 .bill-disc{padding:8px 12px;border-top:1px solid var(--border);background:var(--faint)}
 .bill-disc-hd{display:flex;align-items:center;justify-content:space-between}
 .bill-disc-hd span{font-size:11px;color:var(--muted)}
 .bill-disc-row{display:flex;gap:6px;margin-top:6px}
 .totals{padding:10px 14px;border-top:1px solid var(--border)}
-.tr{display:flex;justify-content:space-between;font-size:13px;padding:2px 0}
+.tr{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
 .tr.muted{color:var(--muted)}
 .tr.disc{color:var(--purple)}
 .tr.big{font-size:15px;font-weight:700;padding-top:8px;border-top:1px solid var(--border);margin-top:4px}
 .pay-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:8px 12px}
-.pb{padding:9px 4px;border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer;background:var(--faint);color:var(--muted);text-align:center;transition:all 120ms}
+.pb{padding:8px 4px;border:1px solid var(--border);border-radius:7px;font-size:11px;cursor:pointer;background:var(--faint);color:var(--muted);text-align:center;transition:all 120ms}
 .pb.on{border-color:var(--green-m);background:var(--green-l);color:var(--green);font-weight:600}
-.pay-btn{margin:0 12px 14px;padding:14px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer;text-align:center;transition:background 120ms}
+.pay-btn{margin:0 12px 14px;padding:13px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;text-align:center;transition:background 120ms}
 .pay-btn:hover{background:#15803d}
 .pay-btn:disabled{background:#94a3b8;cursor:not-allowed}
 
@@ -181,10 +181,64 @@ textarea{resize:vertical;min-height:70px}
 /* COA BADGE */
 .coa-badge{font-size:10px;padding:2px 8px;border-radius:4px;background:var(--blue-l);color:var(--blue);font-weight:500}
 
+/* ── MOBILE RESPONSIVE ─────────────────────────────────────── */
 @media(max-width:768px){
-  .pos-shell{grid-template-columns:1fr}
-  .cart{border-top:1px solid var(--border)}
+  /* NAV: เลื่อนได้แนวนอน ไม่ overflow */
+  .nav{padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px;flex-shrink:0}
+  .nav::-webkit-scrollbar{display:none}
+  .brand{font-size:12px;margin-right:8px;flex-shrink:0;letter-spacing:0}
+  .ntab{padding:5px 10px;font-size:12px;flex-shrink:0}
+  .nav-r{flex-shrink:0;gap:6px}
+  .clk{display:none}
+  .db-badge{font-size:9px;padding:2px 7px}
+
+  /* SETUP BANNER */
+  .setup-banner{flex-direction:column;padding:12px 14px;gap:8px}
+  .setup-banner input{width:100%}
+  .setup-banner p{font-size:12px}
+
+  /* PAGE */
+  .page{padding:12px}
+  .page-title{font-size:15px;margin-bottom:12px}
+
+  /* STATS: 2 col บนมือถือ */
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+  .stat{padding:10px 12px}
+  .stat-val{font-size:18px}
+
+  /* POS SHELL */
+  .pos-shell{grid-template-columns:1fr;min-height:unset;border-radius:8px}
+  /* Strain area: เลื่อนได้ในตัว */
+  .strain-area{max-height:calc(100vh - 130px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* Cart: เต็มความสูง viewport เมื่อเปิดแท็บตะกร้า */
+  .cart{border-top:none;display:flex;flex-direction:column;max-height:calc(100vh - 130px)}
+  .cart-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:none}
+  /* ปิด bottom rounded บน modal ที่ขึ้นจากล่าง */
+  .pos-shell{border-bottom-left-radius:0;border-bottom-right-radius:0}
+
+  /* FORMS */
   .form-grid-2,.form-grid-3{grid-template-columns:1fr}
+
+  /* TABLE CARDS: เลื่อนได้แนวนอน */
+  .card{overflow-x:auto}
+  .card table{min-width:480px}
+
+  /* MODAL: ขึ้นจากด้านล่างบนมือถือ */
+  .overlay{padding:0;align-items:flex-end}
+  .modal{border-radius:16px 16px 0 0;max-height:92vh;max-width:100%}
+
+  /* MOBILE POS TAB TOGGLE */
+  .mob-pos-tabs{display:flex;border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:10px;background:var(--surface)}
+  .mob-tab{flex:1;padding:10px 8px;font-size:13px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 120ms;display:flex;align-items:center;justify-content:center;gap:6px}
+  .mob-tab.on{background:var(--green-l);color:var(--green);font-weight:600}
+  .mob-cart-badge{background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;min-width:18px;text-align:center}
+  /* ซ่อน panel ที่ไม่ active */
+  .pos-shell.mob-show-cart .strain-area{display:none}
+  .pos-shell:not(.mob-show-cart) .cart{display:none}
+}
+@media(min-width:769px){
+  /* ซ่อน mobile toggle บน desktop */
+  .mob-pos-tabs{display:none}
 }
 
 /* ── AUTH ─────────────────────────────────────────────────── */
@@ -233,10 +287,6 @@ const { useState, useEffect, useCallback, useRef } = React;
 const { createClient } = supabase;
 
 // ── SUPABASE CLIENT ─────────────────────────────────────────
-// 👇 ใส่ค่าจริงจาก Supabase Dashboard → Project Settings → API
-const SUPABASE_URL = 'https://pqzktyhsjkoimaupybfb.supabase.co/';
-const SUPABASE_KEY = 'sb_publishable_uCERZBaAxwieHGsP3ZTtWA_5uEahK2u';
-
 let sb = null;
 function getClient(url, key) {
   if (!url || !key) return null;
@@ -300,11 +350,10 @@ function stockLabel(s) {
 }
 
 function itemNet(ci) {
-  const wg   = parseFloat(ci.weight_g) || 0;
-  const base = ci.price_per_g * wg;
+  const base = ci.price_per_g * ci.weight_g;
   if (ci.disc_type === 'pct')         return base * (1 - ci.disc_value / 100);
   if (ci.disc_type === 'baht')        return Math.max(0, base - ci.disc_value);
-  if (ci.disc_type === 'price_per_g') return ci.disc_value * wg;
+  if (ci.disc_type === 'price_per_g') return ci.disc_value * ci.weight_g;
   return base;
 }
 
@@ -355,6 +404,7 @@ function POSView({ db, currentStaff }) {
   const [loading, setLoading]     = useState(false);
   const [msg, setMsg]             = useState(null);
   const [showCustModal, setShowCustModal] = useState(false);
+  const [mobileTab, setMobileTab] = useState('strains');
 
   useEffect(() => { loadStrains(); loadCustomers(); }, []);
 
@@ -436,7 +486,17 @@ function POSView({ db, currentStaff }) {
   return (
     <div className="page">
       {msg && <div className={`alert alert-${msg.type === 'ok' ? 'ok' : 'err'}`}>{msg.text}</div>}
-      <div className="pos-shell">
+      {/* Mobile tab toggle — ซ่อนบน desktop ผ่าน CSS */}
+      <div className="mob-pos-tabs">
+        <button className={`mob-tab ${mobileTab==='strains'?'on':''}`} onClick={()=>setMobileTab('strains')}>
+          🌿 สินค้า
+        </button>
+        <button className={`mob-tab ${mobileTab==='cart'?'on':''}`} onClick={()=>setMobileTab('cart')}>
+          🛒 ตะกร้า
+          {cart.length > 0 && <span className="mob-cart-badge">{cart.length}</span>}
+        </button>
+      </div>
+      <div className={`pos-shell${mobileTab==='cart'?' mob-show-cart':''}`}>
         {/* STRAIN GRID */}
         <div className="strain-area">
           <div className="strain-tb">
@@ -497,8 +557,7 @@ function POSView({ db, currentStaff }) {
                           <div className="ci-unit">{fmt(ci.price_per_g)}/g</div>
                         </div>
                         <input className="gram-in" type="number" min={0.5} step={0.5} value={ci.weight_g}
-                          onChange={e=>{ const raw=e.target.value; if(raw===''){updateCart(ci.strain_id,'weight_g','');return;} const v=parseFloat(raw); if(!isNaN(v)&&v>0) updateCart(ci.strain_id,'weight_g',v); }}
-                          onBlur={e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) removeCart(ci.strain_id); }} />
+                          onChange={e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) removeCart(ci.strain_id); else updateCart(ci.strain_id,'weight_g',v); }} />
                         <div className="ci-price">
                           {saved > 0
                             ? <><div style={{fontSize:10,color:'var(--muted)',textDecoration:'line-through'}}>{fmt(base)}</div>
@@ -1574,10 +1633,14 @@ function App() {
     return () => clearInterval(t);
   }, []);
 
-  // Auto-connect using hardcoded credentials on mount
+  // Auto-connect from localStorage on mount
   useEffect(() => {
-    const client = getClient(SUPABASE_URL, SUPABASE_KEY);
-    if (client) handleDbReady(client);
+    const url = localStorage.getItem('sb_url');
+    const key = localStorage.getItem('sb_key');
+    if (url && key) {
+      const client = getClient(url, key);
+      if (client) handleDbReady(client);
+    }
   }, []);
 
   async function handleDbReady(client) {
