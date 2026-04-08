@@ -350,6 +350,12 @@ function stockLabel(s) {
 }
 
 function itemNet(ci) {
+  if (ci.type === 'equipment') {
+    const base = ci.price * ci.qty;
+    if (ci.disc_type === 'pct')  return base * (1 - ci.disc_value / 100);
+    if (ci.disc_type === 'baht') return Math.max(0, base - ci.disc_value);
+    return base;
+  }
   const base = ci.price_per_g * ci.weight_g;
   if (ci.disc_type === 'pct')         return base * (1 - ci.disc_value / 100);
   if (ci.disc_type === 'baht')        return Math.max(0, base - ci.disc_value);
@@ -392,10 +398,12 @@ function SetupBanner({ onConnect }) {
 // ── POS VIEW ─────────────────────────────────────────────────
 function POSView({ db, currentStaff }) {
   const [strains, setStrains]     = useState([]);
+  const [equipment, setEquipment] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cart, setCart]           = useState([]);
   const [customer, setCustomer]   = useState(null);
   const [searchQ, setSearchQ]     = useState('');
+  const [prodTab, setProdTab]     = useState('strains'); // 'strains' | 'equipment'
   const [payMethod, setPayMethod] = useState('cash');
   const [billDiscOpen, setBillDiscOpen] = useState(false);
   const [billDiscType, setBillDiscType] = useState('pct');
@@ -406,11 +414,15 @@ function POSView({ db, currentStaff }) {
   const [showCustModal, setShowCustModal] = useState(false);
   const [mobileTab, setMobileTab] = useState('strains');
 
-  useEffect(() => { loadStrains(); loadCustomers(); }, []);
+  useEffect(() => { loadStrains(); loadEquipment(); loadCustomers(); }, []);
 
   async function loadStrains() {
     const { data } = await db.from('strains').select('*').eq('is_active', true).order('name');
     if (data) setStrains(data);
+  }
+  async function loadEquipment() {
+    const { data } = await db.from('equipment').select('*').eq('is_active', true).order('category,name');
+    if (data) setEquipment(data);
   }
   async function loadCustomers() {
     const { data } = await db.from('customers').select('id,name,phone,id_card,total_spent,visit_count').order('name');
@@ -418,24 +430,40 @@ function POSView({ db, currentStaff }) {
   }
 
   const filtered = strains.filter(s => s.name.toLowerCase().includes(searchQ.toLowerCase()));
+  const filteredEq = equipment.filter(e => e.name.toLowerCase().includes(searchQ.toLowerCase()));
 
+  // Strain cart
   function addToCart(strain) {
     if (strain.stock_g <= 0) return;
     setCart(prev => {
-      if (prev.find(c => c.strain_id === strain.id)) return prev;
-      return [...prev, { strain_id: strain.id, strain_name: strain.name, price_per_g: strain.price_per_g, weight_g: 1, disc_type: 'none', disc_value: 0, discOpen: false }];
+      if (prev.find(c => c.type !== 'equipment' && c.strain_id === strain.id)) return prev;
+      return [...prev, { type: 'strain', strain_id: strain.id, strain_name: strain.name, price_per_g: strain.price_per_g, weight_g: 1, disc_type: 'none', disc_value: 0, discOpen: false }];
     });
   }
-
   function updateCart(strain_id, field, val) {
-    setCart(prev => prev.map(c => c.strain_id === strain_id ? { ...c, [field]: val } : c));
+    setCart(prev => prev.map(c => c.type !== 'equipment' && c.strain_id === strain_id ? { ...c, [field]: val } : c));
   }
   function removeCart(strain_id) {
-    setCart(prev => prev.filter(c => c.strain_id !== strain_id));
+    setCart(prev => prev.filter(c => !(c.type !== 'equipment' && c.strain_id === strain_id)));
   }
 
-  const itemSubtotal = cart.reduce((a, c) => a + c.price_per_g * c.weight_g, 0);
-  const itemDisc     = cart.reduce((a, c) => a + (c.price_per_g * c.weight_g - itemNet(c)), 0);
+  // Equipment cart
+  function addEquipToCart(item) {
+    if (item.stock_qty <= 0) return;
+    setCart(prev => {
+      if (prev.find(c => c.type === 'equipment' && c.equipment_id === item.id)) return prev;
+      return [...prev, { type: 'equipment', equipment_id: item.id, equipment_name: item.name, price: item.price, qty: 1, disc_type: 'none', disc_value: 0, discOpen: false }];
+    });
+  }
+  function updateEquipCart(equipment_id, field, val) {
+    setCart(prev => prev.map(c => c.type === 'equipment' && c.equipment_id === equipment_id ? { ...c, [field]: val } : c));
+  }
+  function removeEquipCart(equipment_id) {
+    setCart(prev => prev.filter(c => !(c.type === 'equipment' && c.equipment_id === equipment_id)));
+  }
+
+  const itemSubtotal = cart.reduce((a, c) => a + (c.type === 'equipment' ? c.price * c.qty : c.price_per_g * c.weight_g), 0);
+  const itemDisc     = cart.reduce((a, c) => a + ((c.type === 'equipment' ? c.price * c.qty : c.price_per_g * c.weight_g) - itemNet(c)), 0);
   const afterItemDisc = itemSubtotal - itemDisc;
   const billDiscAmt  = billDiscOpen && billDiscVal
     ? billDiscType === 'pct' ? afterItemDisc * parseFloat(billDiscVal) / 100
@@ -460,22 +488,20 @@ function POSView({ db, currentStaff }) {
       }).select().single();
       if (txnErr) throw txnErr;
 
-      const items = cart.map(c => ({
-        transaction_id: txn.id,
-        strain_id: c.strain_id,
-        strain_name: c.strain_name,
-        price_per_g: c.price_per_g,
-        weight_g: c.weight_g,
-        disc_type: c.disc_type !== 'none' ? c.disc_type : null,
-        disc_value: c.disc_value,
-        line_total: itemNet(c),
-      }));
+      const items = cart.map(c => c.type === 'equipment'
+        ? { transaction_id: txn.id, equipment_id: c.equipment_id, strain_name: c.equipment_name,
+            price_per_g: c.price, weight_g: c.qty, qty: c.qty,
+            disc_type: c.disc_type !== 'none' ? c.disc_type : null, disc_value: c.disc_value, line_total: itemNet(c) }
+        : { transaction_id: txn.id, strain_id: c.strain_id, strain_name: c.strain_name,
+            price_per_g: c.price_per_g, weight_g: c.weight_g,
+            disc_type: c.disc_type !== 'none' ? c.disc_type : null, disc_value: c.disc_value, line_total: itemNet(c) }
+      );
       const { error: itemErr } = await db.from('transaction_items').insert(items);
       if (itemErr) throw itemErr;
 
       setMsg({ type: 'ok', text: `ชำระเงินสำเร็จ ${fmt(grand)} — บิล ${txn.txn_code}` });
       setCart([]); setCustomer(null); setBillDiscOpen(false); setBillDiscVal(''); setBillDiscNote('');
-      loadStrains();
+      loadStrains(); loadEquipment();
       setTimeout(() => setMsg(null), 4000);
     } catch (e) {
       setMsg({ type: 'err', text: 'เกิดข้อผิดพลาด: ' + e.message });
@@ -497,29 +523,63 @@ function POSView({ db, currentStaff }) {
         </button>
       </div>
       <div className={`pos-shell${mobileTab==='cart'?' mob-show-cart':''}`}>
-        {/* STRAIN GRID */}
+        {/* STRAIN / EQUIPMENT GRID */}
         <div className="strain-area">
-          <div className="strain-tb">
-            <input className="strain-search" placeholder="ค้นหา strain..." value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+          <div className="strain-tb" style={{flexDirection:'column',gap:8,alignItems:'stretch'}}>
+            <div style={{display:'flex',gap:6}}>
+              <button className={`btn btn-sm ${prodTab==='strains'?'btn-primary':'btn-outline'}`}
+                      onClick={()=>{setProdTab('strains');setSearchQ('');}}>
+                🌿 กัญชา ({strains.length})
+              </button>
+              <button className={`btn btn-sm ${prodTab==='equipment'?'btn-blue':'btn-outline'}`}
+                      onClick={()=>{setProdTab('equipment');setSearchQ('');}}>
+                🛍️ อุปกรณ์ ({equipment.length})
+              </button>
+            </div>
+            <input className="strain-search"
+                   placeholder={prodTab==='strains'?'ค้นหา strain...':'ค้นหาอุปกรณ์...'}
+                   value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
           </div>
-          {!strains.length
-            ? <div className="empty"><div className="empty-icon">🌿</div><p>ยังไม่มีสินค้า — เพิ่มได้ที่แท็บ สต็อก</p></div>
-            : <div className="sgrid">
-                {filtered.map(s => (
-                  <div key={s.id} className={`sc ${cart.find(c=>c.strain_id===s.id)?'sel':''} ${s.stock_g<=0?'disabled':''}`} onClick={()=>addToCart(s)}>
-                    <div className="sc-top">
-                      <span className={`pill ${typeCls[s.type]||'h'}`}>{typeLabel[s.type]||s.type}</span>
-                      <span className={`pill ${stockCls(s)}`}>{stockLabel(s)}</span>
+
+          {prodTab === 'strains' && (
+            !strains.length
+              ? <div className="empty"><div className="empty-icon">🌿</div><p>ยังไม่มีสินค้า — เพิ่มได้ที่แท็บ สต็อก</p></div>
+              : <div className="sgrid">
+                  {filtered.map(s => (
+                    <div key={s.id} className={`sc ${cart.find(c=>c.type!=='equipment'&&c.strain_id===s.id)?'sel':''} ${s.stock_g<=0?'disabled':''}`} onClick={()=>addToCart(s)}>
+                      <div className="sc-top">
+                        <span className={`pill ${typeCls[s.type]||'h'}`}>{typeLabel[s.type]||s.type}</span>
+                        <span className={`pill ${stockCls(s)}`}>{stockLabel(s)}</span>
+                      </div>
+                      <div className="sc-name">{s.name}</div>
+                      <div className="sc-sub">{s.thc_pct > 0 ? `THC ${s.thc_pct}%` : 'Full Spectrum'}</div>
+                      <div className="sc-ft"><span className="sc-price">{fmt(s.price_per_g)}/g</span></div>
                     </div>
-                    <div className="sc-name">{s.name}</div>
-                    <div className="sc-sub">{s.thc_pct > 0 ? `THC ${s.thc_pct}%` : 'Full Spectrum'}</div>
-                    <div className="sc-ft">
-                      <span className="sc-price">{fmt(s.price_per_g)}/g</span>
+                  ))}
+                </div>
+          )}
+
+          {prodTab === 'equipment' && (
+            !equipment.length
+              ? <div className="empty"><div className="empty-icon">🛍️</div><p>ยังไม่มีอุปกรณ์ — เพิ่มได้ที่แท็บ อุปกรณ์</p></div>
+              : <div className="sgrid">
+                  {filteredEq.map(item => (
+                    <div key={item.id}
+                         className={`sc ${cart.find(c=>c.type==='equipment'&&c.equipment_id===item.id)?'sel':''} ${item.stock_qty<=0?'disabled':''}`}
+                         onClick={()=>addEquipToCart(item)}>
+                      <div className="sc-top">
+                        <span className="pill c" style={{fontSize:9}}>{item.category}</span>
+                        <span className={`pill ${item.stock_qty<=0?'out':item.stock_qty<5?'low':'ok'}`}>
+                          {item.stock_qty<=0?'หมด':`${item.stock_qty} ชิ้น`}
+                        </span>
+                      </div>
+                      <div className="sc-name">{item.name}</div>
+                      <div className="sc-sub" style={{minHeight:16}}>{item.description||''}</div>
+                      <div className="sc-ft"><span className="sc-price">{fmt(item.price)}</span></div>
                     </div>
-                  </div>
-                ))}
-              </div>
-          }
+                  ))}
+                </div>
+          )}
         </div>
 
         {/* CART */}
@@ -544,20 +604,26 @@ function POSView({ db, currentStaff }) {
 
           <div className="cart-body">
             {!cart.length
-              ? <div className="empty" style={{padding:'30px 10px'}}><div className="empty-icon">🛒</div><p style={{fontSize:12}}>แตะ strain เพื่อเพิ่ม</p></div>
+              ? <div className="empty" style={{padding:'30px 10px'}}><div className="empty-icon">🛒</div><p style={{fontSize:12}}>แตะสินค้าเพื่อเพิ่ม</p></div>
               : cart.map(ci => {
-                  const base = ci.price_per_g * ci.weight_g;
-                  const net  = itemNet(ci);
+                  const isEq  = ci.type === 'equipment';
+                  const base  = isEq ? ci.price * ci.qty : ci.price_per_g * ci.weight_g;
+                  const net   = itemNet(ci);
                   const saved = base - net;
+                  const key   = isEq ? 'eq-'+ci.equipment_id : ci.strain_id;
                   return (
-                    <div key={ci.strain_id} className="ci">
+                    <div key={key} className="ci">
                       <div className="ci-main">
                         <div className="ci-info">
-                          <div className="ci-name">{ci.strain_name}</div>
-                          <div className="ci-unit">{fmt(ci.price_per_g)}/g</div>
+                          <div className="ci-name">{isEq ? ci.equipment_name : ci.strain_name}</div>
+                          <div className="ci-unit">{isEq ? `${fmt(ci.price)}/ชิ้น` : `${fmt(ci.price_per_g)}/g`}</div>
                         </div>
-                        <input className="gram-in" type="number" min={0.5} step={0.5} value={ci.weight_g}
-                          onChange={e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) removeCart(ci.strain_id); else updateCart(ci.strain_id,'weight_g',v); }} />
+                        {isEq
+                          ? <input className="gram-in" type="number" min={1} step={1} value={ci.qty}
+                              onChange={e=>{ const v=parseInt(e.target.value); if(isNaN(v)||v<=0) removeEquipCart(ci.equipment_id); else updateEquipCart(ci.equipment_id,'qty',v); }} />
+                          : <input className="gram-in" type="number" min={0.5} step={0.5} value={ci.weight_g}
+                              onChange={e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) removeCart(ci.strain_id); else updateCart(ci.strain_id,'weight_g',v); }} />
+                        }
                         <div className="ci-price">
                           {saved > 0
                             ? <><div style={{fontSize:10,color:'var(--muted)',textDecoration:'line-through'}}>{fmt(base)}</div>
@@ -565,23 +631,31 @@ function POSView({ db, currentStaff }) {
                             : fmt(net)
                           }
                         </div>
-                        <button className="disc-btn" onClick={()=>updateCart(ci.strain_id,'discOpen',!ci.discOpen)}>
+                        <button className="disc-btn"
+                          onClick={()=> isEq ? updateEquipCart(ci.equipment_id,'discOpen',!ci.discOpen)
+                                              : updateCart(ci.strain_id,'discOpen',!ci.discOpen)}>
                           {ci.discOpen ? '✕' : 'ลด'}
                         </button>
-                        <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:16}} onClick={()=>removeCart(ci.strain_id)}>×</button>
+                        <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:16}}
+                          onClick={()=> isEq ? removeEquipCart(ci.equipment_id) : removeCart(ci.strain_id)}>×</button>
                       </div>
                       {ci.discOpen && (
                         <div className="ci-disc">
-                          <select className="disc-sel" value={ci.disc_type} onChange={e=>updateCart(ci.strain_id,'disc_type',e.target.value)}>
+                          <select className="disc-sel" value={ci.disc_type}
+                            onChange={e=> isEq ? updateEquipCart(ci.equipment_id,'disc_type',e.target.value)
+                                               : updateCart(ci.strain_id,'disc_type',e.target.value)}>
                             <option value="none">ไม่มีส่วนลด</option>
                             <option value="pct">% ลด</option>
                             <option value="baht">฿ ลดจากยอด</option>
-                            <option value="price_per_g">ราคา/g พิเศษ</option>
+                            {!isEq && <option value="price_per_g">ราคา/g พิเศษ</option>}
                           </select>
                           {ci.disc_type !== 'none' &&
                             <input className="disc-in" type="number" min={0} value={ci.disc_value||''}
                               placeholder={ci.disc_type==='pct'?'เช่น 10':ci.disc_type==='baht'?'เช่น 50':'ราคา/g'}
-                              onChange={e=>updateCart(ci.strain_id,'disc_value',parseFloat(e.target.value)||0)} />
+                              onChange={e=> {
+                                const v = parseFloat(e.target.value)||0;
+                                isEq ? updateEquipCart(ci.equipment_id,'disc_value',v) : updateCart(ci.strain_id,'disc_value',v);
+                              }} />
                           }
                           {saved > 0 && <span className="disc-saved">ลด {fmt(saved)}</span>}
                         </div>
@@ -1612,6 +1686,226 @@ function StaffView({ db }) {
   );
 }
 
+// ── EQUIPMENT VIEW ────────────────────────────────
+function EquipmentView({ db }) {
+  const [items, setItems]   = useState([]);
+  const [modal, setModal]   = useState(null); // 'add' | 'edit'
+  const [editing, setEditing] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg]       = useState(null);
+  const [searchQ, setSearchQ] = useState('');
+
+  const CATEGORIES = [
+    { value:'pipe',       label:'ไปป์' },
+    { value:'paper',      label:'กระดาษ' },
+    { value:'grinder',    label:'กรายเดอร์' },
+    { value:'bong',       label:'บ้อง' },
+    { value:'vaporizer',  label:'เครื่องวาปไรเซอร์' },
+    { value:'accessory',  label:'อุปกรณ์เสริม' },
+    { value:'other',      label:'อื่นๆ' },
+  ];
+
+  const initForm = { name:'', category:'other', price:'', stock_qty:'0', description:'', is_active:true };
+  const [form, setForm] = useState(initForm);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    const { data } = await db.from('equipment').select('*').order('name');
+    if (data) setItems(data);
+  }
+
+  const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  function openAdd() { setForm(initForm); setEditing(null); setModal('add'); }
+  function openEdit(item) {
+    setForm({ name: item.name, category: item.category, price: String(item.price),
+              stock_qty: String(item.stock_qty), description: item.description||'', is_active: item.is_active });
+    setEditing(item); setModal('edit');
+  }
+
+  async function save() {
+    if (!form.name.trim() || !form.price) return;
+    setLoading(true);
+    const payload = {
+      name: form.name.trim(),
+      category: form.category,
+      price: parseFloat(form.price),
+      stock_qty: parseInt(form.stock_qty) || 0,
+      description: form.description.trim() || null,
+      is_active: form.is_active,
+    };
+    let error;
+    if (editing) {
+      ({ error } = await db.from('equipment').update(payload).eq('id', editing.id));
+    } else {
+      ({ error } = await db.from('equipment').insert(payload));
+    }
+    if (error) setMsg({ type:'err', text: error.message });
+    else { setMsg({ type:'ok', text: editing ? 'อัปเดตสำเร็จ' : 'เพิ่มอุปกรณ์สำเร็จ' }); setModal(null); load(); }
+    setLoading(false);
+    setTimeout(() => setMsg(null), 3000);
+  }
+
+  async function adjustStock(item, delta) {
+    const newQty = Math.max(0, item.stock_qty + delta);
+    await db.from('equipment').update({ stock_qty: newQty }).eq('id', item.id);
+    load();
+  }
+
+  async function toggleActive(item) {
+    await db.from('equipment').update({ is_active: !item.is_active }).eq('id', item.id);
+    load();
+  }
+
+  const filtered = items.filter(it =>
+    it.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+    it.category.toLowerCase().includes(searchQ.toLowerCase())
+  );
+
+  const catLabel = v => CATEGORIES.find(c => c.value === v)?.label || v;
+
+  return (
+    <div className="page">
+      {msg && <div className={`alert alert-${msg.type==='ok'?'ok':'err'}`}>{msg.text}</div>}
+
+      <div className="page-title">
+        อุปกรณ์และสินค้าอื่นๆ
+        <button className="btn btn-primary" style={{marginLeft:'auto'}} onClick={openAdd}>
+          + เพิ่มอุปกรณ์
+        </button>
+      </div>
+
+      <div style={{marginBottom:16}}>
+        <input placeholder="ค้นหาชื่อหรือหมวดหมู่..." value={searchQ}
+               onChange={e => setSearchQ(e.target.value)}
+               style={{maxWidth:320}} />
+      </div>
+
+      <div className="card">
+        <table>
+          <thead>
+            <tr>
+              <th>ชื่อสินค้า</th>
+              <th>หมวดหมู่</th>
+              <th>ราคา (฿)</th>
+              <th>สต็อก</th>
+              <th>คำอธิบาย</th>
+              <th>สถานะ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!filtered.length && (
+              <tr><td colSpan={7} style={{textAlign:'center',color:'var(--muted)',padding:32}}>
+                {searchQ ? 'ไม่พบสินค้า' : 'ยังไม่มีอุปกรณ์ — กด "+ เพิ่มอุปกรณ์" เพื่อเริ่มต้น'}
+              </td></tr>
+            )}
+            {filtered.map(item => (
+              <tr key={item.id} style={{opacity: item.is_active ? 1 : 0.45}}>
+                <td style={{fontWeight:500}}>{item.name}</td>
+                <td><span className="pill c">{catLabel(item.category)}</span></td>
+                <td style={{fontWeight:600,color:'var(--green)'}}>{fmt(item.price)}</td>
+                <td>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <button className="btn btn-outline btn-sm"
+                            onClick={() => adjustStock(item, -1)}
+                            style={{padding:'2px 8px',minWidth:24}}>−</button>
+                    <span style={{minWidth:28,textAlign:'center',fontWeight:600,
+                                  color: item.stock_qty === 0 ? 'var(--red)' : item.stock_qty < 5 ? 'var(--amber)' : 'var(--text)'}}>
+                      {item.stock_qty}
+                    </span>
+                    <button className="btn btn-outline btn-sm"
+                            onClick={() => adjustStock(item, 1)}
+                            style={{padding:'2px 8px',minWidth:24}}>+</button>
+                  </div>
+                </td>
+                <td style={{color:'var(--muted)',fontSize:12,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {item.description || '—'}
+                </td>
+                <td>
+                  <span className={`pill ${item.is_active ? 'ok' : 'out'}`}>
+                    {item.is_active ? 'ใช้งาน' : 'ปิดใช้'}
+                  </span>
+                </td>
+                <td>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn btn-outline btn-sm" onClick={() => openEdit(item)}>แก้ไข</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => toggleActive(item)}
+                            style={{color: item.is_active ? 'var(--amber)' : 'var(--green)'}}>
+                      {item.is_active ? 'ปิด' : 'เปิด'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ADD / EDIT MODAL */}
+      {modal && (
+        <div className="overlay" onClick={e => e.target===e.currentTarget && setModal(null)}>
+          <div className="modal">
+            <div className="modal-hd">
+              <h3>{modal==='add' ? '+ เพิ่มอุปกรณ์' : 'แก้ไขอุปกรณ์'}</h3>
+              <button className="close-btn" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div>
+                  <label>ชื่อสินค้า *</label>
+                  <input value={form.name} onChange={e => setF('name', e.target.value)}
+                         placeholder="เช่น Raw Papers King Size" />
+                </div>
+                <div className="form-grid form-grid-2">
+                  <div>
+                    <label>หมวดหมู่</label>
+                    <select value={form.category} onChange={e => setF('category', e.target.value)}>
+                      {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label>ราคา (฿) *</label>
+                    <input type="number" min="0" step="0.01" value={form.price}
+                           onChange={e => setF('price', e.target.value)} placeholder="0" />
+                  </div>
+                </div>
+                <div>
+                  <label>จำนวนสต็อก</label>
+                  <input type="number" min="0" step="1" value={form.stock_qty}
+                         onChange={e => setF('stock_qty', e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <label>คำอธิบาย</label>
+                  <textarea value={form.description}
+                            onChange={e => setF('description', e.target.value)}
+                            placeholder="รายละเอียดเพิ่มเติม..." rows={2} />
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <input type="checkbox" id="eq-active" checked={form.is_active}
+                         onChange={e => setF('is_active', e.target.checked)}
+                         style={{width:'auto'}} />
+                  <label htmlFor="eq-active" style={{margin:0,textTransform:'none',letterSpacing:0,fontSize:13}}>
+                    เปิดใช้งาน
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button className="btn btn-outline" onClick={() => setModal(null)}>ยกเลิก</button>
+              <button className="btn btn-primary" disabled={!form.name.trim() || !form.price || loading}
+                      onClick={save}>
+                {loading ? 'กำลังบันทึก...' : modal==='add' ? 'เพิ่มอุปกรณ์' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── ROOT APP ─────────────────────────────────────────────────
 function App() {
   const [db, setDb]           = useState(null);
@@ -1713,6 +2007,7 @@ function App() {
     { id:'customers', label:'ลูกค้า',   icon:'Users' },
     { id:'report',    label:'รายงาน',   icon:'BarChart2', ownerOnly: true },
     { id:'staff',     label:'พนักงาน',  icon:'UserCog',   ownerOnly: true },
+    { id:'equipment', label:'อุปกรณ์',  icon:'ShoppingBag', ownerOnly: true },
   ];
 
   const visibleTabs = navTabs.filter(t => !t.ownerOnly || currentStaff?.role === 'owner');
@@ -1791,6 +2086,7 @@ function App() {
           {view === 'customers' && <CustomersView db={db} />}
           {view === 'report'    && <ReportView    db={db} />}
           {view === 'staff'     && <StaffView     db={db} />}
+          {view === 'equipment' && <EquipmentView db={db} />}
         </>
       )}
     </>
